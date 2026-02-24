@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import { useI18n } from '../context/I18nContext'
+import { useAuth } from '../../context/AuthContext'
+import { useI18n } from '../../context/I18nContext'
+import { useTheme } from '../../context/ThemeContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
-export default function Login() {
+export default function AdminLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
@@ -16,6 +17,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { signIn, signUp } = useAuth()
   const { t, lang, setLang } = useI18n()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,19 +31,27 @@ export default function Login() {
       setError(error.message)
       setLoading(false)
     } else {
-      navigate('/')
+      navigate('/admin')
     }
   }
 
   return (
     <div className='min-h-screen flex items-center justify-center relative overflow-hidden bg-background'>
-      {/* Lang toggle */}
-      <button
-        onClick={() => setLang(lang === 'uk' ? 'en' : 'uk')}
-        className='absolute top-4 right-4 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border/50 bg-card/50 backdrop-blur-sm'
-      >
-        {lang === 'uk' ? '🇬🇧 EN' : '🇺🇦 UK'}
-      </button>
+      {/* Top controls */}
+      <div className='absolute top-4 right-4 flex items-center gap-2'>
+        <button
+          onClick={toggleTheme}
+          className='text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md border border-border/50 bg-card/50 backdrop-blur-sm'
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+        <button
+          onClick={() => setLang(lang === 'uk' ? 'en' : 'uk')}
+          className='text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border/50 bg-card/50 backdrop-blur-sm'
+        >
+          {lang === 'uk' ? '🇬🇧 EN' : '🇺🇦 UK'}
+        </button>
+      </div>
 
       {/* Animated background */}
       <div className='absolute inset-0 -z-10'>
@@ -53,7 +63,6 @@ export default function Login() {
       </div>
 
       <div className='w-full max-w-md px-4'>
-        {/* Logo / Brand */}
         <div className='text-center mb-8'>
           <h1 className='text-3xl font-bold tracking-tight'>{t('login.brand')}</h1>
           <p className='text-muted-foreground mt-1'>{t('login.brand.subtitle')}</p>
@@ -96,7 +105,7 @@ export default function Login() {
 
               <Button
                 type='submit'
-                className='w-full h-11 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 transition-all duration-300'
+                className='w-full h-11 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 transition-all duration-300'
                 disabled={loading}
               >
                 {loading ? (
