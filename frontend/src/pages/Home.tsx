@@ -16,7 +16,7 @@ export default function Home() {
   const { t } = useI18n()
 
   return (
-    <main className='flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)] px-6'>
+    <main className='flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)] px-4 sm:px-6'>
       {/* Hero */}
       <div className='relative text-center max-w-2xl'>
         {/* Glow */}

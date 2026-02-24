@@ -231,7 +231,7 @@ export default function Dashboard() {
     <div className='min-h-screen bg-background'>
       {/* Header */}
       <header className='sticky top-0 z-50 border-b bg-background/80 backdrop-blur-lg'>
-        <div className='max-w-7xl mx-auto flex items-center justify-between h-14 px-6'>
+        <div className='max-w-7xl mx-auto flex items-center justify-between h-14 px-4 sm:px-6'>
           <div className='flex items-center gap-3'>
             <div className='w-7 h-7 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center'>
               <span className='text-xs font-bold text-white'>B</span>
@@ -307,18 +307,18 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className='max-w-7xl mx-auto p-6'>
-        <div className='flex items-center justify-between mb-8'>
+      <main className='max-w-7xl mx-auto p-4 sm:p-6'>
+        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8'>
           <div>
-            <h1 className='text-3xl font-bold tracking-tight'>{t('dash.title')}</h1>
-            <p className='text-muted-foreground mt-1'>{t('dash.subtitle')}</p>
+            <h1 className='text-2xl sm:text-3xl font-bold tracking-tight'>{t('dash.title')}</h1>
+            <p className='text-muted-foreground mt-1 text-sm sm:text-base'>{t('dash.subtitle')}</p>
           </div>
           <div className='flex gap-2'>
-            <Button variant='outline' onClick={() => setCsvOpen(true)}>
-              📄 CSV Import
+            <Button variant='outline' size='sm' onClick={() => setCsvOpen(true)}>
+              📄 CSV
             </Button>
-            <Button onClick={() => setCreateOpen(true)} className='bg-linear-to-r from-emerald-600 to-teal-600 text-white'>
-              ➕ Manual Order
+            <Button size='sm' onClick={() => setCreateOpen(true)} className='bg-linear-to-r from-emerald-600 to-teal-600 text-white'>
+              ➕ Order
             </Button>
           </div>
         </div>
@@ -354,7 +354,7 @@ export default function Dashboard() {
         <Separator className='mb-6' />
 
         {/* Filters */}
-        <div className='flex flex-wrap items-end gap-3 mb-4'>
+        <div className='flex flex-wrap items-end gap-2 sm:gap-3 mb-4 overflow-x-auto pb-1'>
           <div className='space-y-1'>
             <Label className='text-xs text-muted-foreground'>Status</Label>
             <select
