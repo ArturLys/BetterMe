@@ -413,7 +413,7 @@ export default function Dashboard() {
         </div>
 
         {/* Table */}
-        <Card>
+        <Card className='overflow-hidden py-0 gap-0'>
           <CardContent className='p-0'>
             {loading && (
               <div className='flex items-center justify-center h-32'>
