@@ -34,7 +34,7 @@ export default function PublicLayout() {
             <div className='w-7 h-7 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center transition-transform group-hover:scale-110'>
               <span className='text-xs font-bold text-white'>B</span>
             </div>
-            <span className='font-semibold'>BetterMe</span>
+            <span className='font-semibold hidden min-[400px]:inline'>BetterMe</span>
           </Link>
 
           {/* Desktop nav */}
