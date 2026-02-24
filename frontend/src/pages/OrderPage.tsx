@@ -91,7 +91,7 @@ export default function OrderPage() {
                     <img src={img} alt={id} className='w-full h-28 object-cover' />
                     <div className='absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent' />
                     <span className='absolute bottom-2 left-0 right-0 text-center text-white text-sm font-semibold drop-shadow-lg'>
-                      {t(`order.kit.${id}`)}
+                      {t(`order.kit.${id}` as any)}
                     </span>
                     {form.kitType === id && (
                       <div className='absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shadow'>

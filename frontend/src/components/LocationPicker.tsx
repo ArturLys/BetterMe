@@ -65,7 +65,7 @@ export default function LocationPicker({ latitude, longitude, onChange, compact 
   const [locationDisplay, setLocationDisplay] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const suggestionsRef = useRef<HTMLDivElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const markerPos: [number, number] | null = latitude && longitude ? [parseFloat(latitude), parseFloat(longitude)] : null
 

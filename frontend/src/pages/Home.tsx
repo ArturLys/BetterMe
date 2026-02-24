@@ -60,7 +60,7 @@ export default function Home() {
             </div>
             <div className='absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent' />
             <div className='absolute bottom-0 left-0 right-0 p-4'>
-              <h3 className='font-semibold text-white text-lg drop-shadow-lg'>{t(`order.kit.${id}`)}</h3>
+              <h3 className='font-semibold text-white text-lg drop-shadow-lg'>{t(`order.kit.${id}` as any)}</h3>
               <p className='text-white/70 text-sm'>Wellness Kit</p>
             </div>
           </Link>
