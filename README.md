@@ -1,3 +1,3 @@
-фронт, адмін панель в frontend/
+адмін панель в frontend/
 
 API бек в backend/
