@@ -28,7 +28,7 @@ const translations = {
     'dash.admin': 'Адмін',
     'dash.stats.orders': 'Всього замовлень',
     'dash.stats.tax': 'Зібрано податків',
-    'dash.stats.pending': 'Очікує оплати',
+    'dash.stats.pending': 'Неоплачено (на стор.)',
 
     // Dashboard — orders table
     'dash.orders.id': 'ID',
@@ -169,7 +169,7 @@ const translations = {
     'dash.admin': 'Admin',
     'dash.stats.orders': 'Total Orders',
     'dash.stats.tax': 'Tax Collected',
-    'dash.stats.pending': 'Awaiting Payment',
+    'dash.stats.pending': 'Unpaid (on page)',
 
     'dash.orders.id': 'ID',
     'dash.orders.email': 'Email',

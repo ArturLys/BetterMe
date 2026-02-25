@@ -37,6 +37,13 @@ export interface OrderCreateDTO {
   kitType: string
 }
 
+/** Result from paginated list endpoint */
+export interface PagedOrders {
+  items: Order[]
+  totalElements: number
+  totalPages: number
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -52,11 +59,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   orders: {
-    list: (filters?: Record<string, string>) => {
-      const p = { size: '20', ...filters }
-      const params = new URLSearchParams(p).toString()
-      return request<Order[]>(`/orders?${params}`)
+    /** Fetches a page of orders. Handles both plain array and Spring Page responses. */
+    list: async (filters?: Record<string, string>): Promise<PagedOrders> => {
+      const params = new URLSearchParams(filters ?? {}).toString()
+      const raw: any = await request<unknown>(`/orders${params ? `?${params}` : ''}`)
+
+      // Spring Page object: { content: [...], totalElements, totalPages, ... }
+      if (raw && !Array.isArray(raw) && Array.isArray(raw.content)) {
+        return {
+          items: raw.content as Order[],
+          totalElements: raw.totalElements ?? -1,
+          totalPages: raw.totalPages ?? -1,
+        }
+      }
+      // Plain array fallback (old backend)
+      if (Array.isArray(raw)) {
+        return { items: raw, totalElements: -1, totalPages: -1 }
+      }
+      return { items: [], totalElements: 0, totalPages: 0 }
     },
+
     getById: (id: number) => request<Order>(`/orders/${id}`),
     create: (dto: OrderCreateDTO) => request<void>('/orders', { method: 'POST', body: JSON.stringify(dto) }),
     setPaid: (id: number) => request<void>(`/orders/${id}`, { method: 'PATCH' }),

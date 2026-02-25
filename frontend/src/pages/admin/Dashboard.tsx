@@ -14,7 +14,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from '@/components/ui/pagination'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationLink,
+  PaginationEllipsis,
+} from '@/components/ui/pagination'
 import {
   Package,
   Award,
@@ -34,6 +42,8 @@ import {
   Moon,
   ChevronDown,
   X,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -61,7 +71,7 @@ const STATUS_COLORS: Record<string, string> = {
   WAITING_FOR_PAYMENT: 'bg-red-500/10 text-red-500 border-red-500/20',
 }
 
-type SortField = 'id' | 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'subtotal'
+type SortField = 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'subtotal'
 type SortDir = 'asc' | 'desc'
 
 const PAGE_SIZES = [10, 20, 50, 100] as const
@@ -91,7 +101,7 @@ export default function Dashboard() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(20)
 
-  const [sortField, setSortField] = useState<SortField>('id')
+  const [sortField, setSortField] = useState<SortField>('timestamp')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   const [filterStatus, setFilterStatus] = useState('')
@@ -121,39 +131,55 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Backend always returns 10 per page regardless of `size` param.
-  // To show more, we fetch multiple backend pages in parallel.
+  // ─── React Query ───
+  // Backend returns 10 per page. We fetch multiple backend pages to fill user's pageSize.
   const BACKEND_PAGE_SIZE = 10
   const pagesNeeded = Math.ceil(pageSize / BACKEND_PAGE_SIZE)
 
   const queryKey = ['orders', page, pageSize, filterStatus, filterEmail, filterKit]
 
   const {
-    data: orders = [],
-    isLoading: loading,
+    data: queryData,
+    isFetching: loading,
     error: queryError,
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: async () => {
-      const baseFilters: Record<string, string> = {}
+    queryFn: async (): Promise<{ items: Order[]; totalElements: number; totalPages: number }> => {
+      const baseFilters: Record<string, string> = { sort: 'id,desc' }
       if (filterStatus) baseFilters.orderStatus = filterStatus
       if (filterEmail) baseFilters.email = filterEmail
       if (filterKit) baseFilters.kitType = filterKit
 
-      const startPage = page * pagesNeeded
+      const backendStartPage = page * pagesNeeded
       const fetches = Array.from({ length: pagesNeeded }, (_, i) =>
-        api.orders.list({ ...baseFilters, page: String(startPage + i), size: '10', sort: 'id,desc' })
+        api.orders.list({ ...baseFilters, page: String(backendStartPage + i), size: String(BACKEND_PAGE_SIZE) })
       )
       const results = await Promise.all(fetches)
-      return results.flatMap((r) => (Array.isArray(r) ? r : []))
+
+      // Merge items from all sub-pages
+      const items = results.flatMap((r) => r.items)
+
+      // Use metadata from first result
+      const first = results[0]
+      return {
+        items,
+        totalElements: first?.totalElements ?? -1,
+        totalPages: first?.totalPages ?? -1,
+      }
     },
     placeholderData: (prev) => prev,
   })
 
+  const orders = queryData?.items ?? []
+  const totalElements = queryData?.totalElements ?? -1
+  const backendTotalPages = queryData?.totalPages ?? -1
+  // Our "virtual" total pages (grouping backend pages into user page size)
+  const totalPages = backendTotalPages > 0 ? Math.ceil((backendTotalPages * BACKEND_PAGE_SIZE) / pageSize) : -1
+  const lastPage = totalPages > 0 ? totalPages - 1 : -1
   const error = queryError ? (queryError as Error).message : null
 
-  // ---- Sorting (client-side on current page) ----
+  // ─── Client-side sort (within current page) ───
   const sortedOrders = [...orders].sort((a, b) => {
     const av = a[sortField] ?? ''
     const bv = b[sortField] ?? ''
@@ -174,7 +200,7 @@ export default function Dashboard() {
     return sortDir === 'asc' ? <ArrowUp size={12} className='inline ml-1' /> : <ArrowDown size={12} className='inline ml-1' />
   }
 
-  // ---- Actions ----
+  // ─── Actions ───
   const confirmDelete = (order: Order) => {
     setDeleteTarget(order)
     setDeleteOpen(true)
@@ -265,6 +291,9 @@ export default function Dashboard() {
   }
 
   const kitLabel = (kit: string) => KIT_INFO[kit as KitType]?.label ?? kit
+
+  const hasNextPage = orders.length >= pageSize || (lastPage >= 0 && page < lastPage)
+  const hasPrevPage = page > 0
 
   // ═══════════════════════════════════════════
   // RENDER
@@ -358,9 +387,7 @@ export default function Dashboard() {
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.orders')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-3xl font-bold'>
-                {t('dash.page.label')} {page + 1}
-              </p>
+              <p className='text-3xl font-bold'>{totalElements >= 0 ? totalElements.toLocaleString() : orders.length}</p>
             </CardContent>
           </Card>
           <Card>
@@ -383,7 +410,7 @@ export default function Dashboard() {
 
         <Separator className='mb-6' />
 
-        {/* Filters */}
+        {/* Filters + page size + refresh */}
         <div className='flex flex-wrap items-end gap-2 sm:gap-3 mb-4 overflow-x-auto pb-1'>
           <div className='space-y-1'>
             <Label className='text-xs text-muted-foreground'>{t('dash.orders.status')}</Label>
@@ -437,11 +464,33 @@ export default function Dashboard() {
           >
             <X size={14} className='mr-1' /> {t('dash.filter.clear')}
           </Button>
-          <div className='ml-auto'>
-            <Button variant='outline' size='sm' onClick={() => refetch()} disabled={loading}>
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            </Button>
+
+          {/* Spacer to push page-size + refresh to the right */}
+          <div className='flex-1' />
+
+          {/* Page size selector */}
+          <div className='flex items-center gap-1.5'>
+            <Label className='text-xs text-muted-foreground whitespace-nowrap'>{t('dash.page.size')}</Label>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value))
+                setPage(0)
+              }}
+              className='h-9 px-2 rounded-md border bg-background text-sm w-16'
+            >
+              {PAGE_SIZES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {/* Refresh */}
+          <Button variant='outline' size='sm' onClick={() => refetch()} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </Button>
         </div>
 
         {/* Table */}
@@ -464,13 +513,7 @@ export default function Dashboard() {
                 <table className='w-full text-sm'>
                   <thead>
                     <tr className='border-b bg-muted/30'>
-                      <th
-                        className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
-                        onClick={() => toggleSort('id')}
-                      >
-                        ID
-                        <SortIcon field='id' />
-                      </th>
+                      <th className='text-left px-3 py-3 font-medium text-muted-foreground'>ID</th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('receiverEmail')}
@@ -579,33 +622,36 @@ export default function Dashboard() {
         </Card>
 
         {/* Pagination */}
-        <div className='flex flex-col sm:flex-row items-center justify-between gap-3 mt-4'>
-          <div className='flex items-center gap-2'>
-            <span className='text-sm text-muted-foreground'>{t('dash.page.size')}</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value))
-                setPage(0)
-              }}
-              className='h-8 px-2 rounded-md border bg-background text-sm'
-            >
-              {PAGE_SIZES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className='flex items-center justify-between gap-3 mt-4'>
+          {/* Info: showing X of Y */}
+          <span className='text-xs text-muted-foreground whitespace-nowrap'>
+            {totalElements >= 0
+              ? `${page * pageSize + 1}–${Math.min((page + 1) * pageSize, totalElements)} / ${totalElements.toLocaleString()}`
+              : `${orders.length} ${t('dash.page.showing')}`}
+          </span>
 
-          <Pagination>
+          <Pagination className='mx-0 w-auto'>
             <PaginationContent>
+              {/* First page */}
+              <PaginationItem>
+                <button
+                  onClick={() => setPage(0)}
+                  disabled={!hasPrevPage}
+                  className={`inline-flex items-center justify-center h-9 w-9 rounded-md text-sm ${!hasPrevPage ? 'pointer-events-none opacity-50' : 'hover:bg-muted cursor-pointer'}`}
+                  title='First'
+                >
+                  <ChevronsLeft size={16} />
+                </button>
+              </PaginationItem>
+              {/* Previous */}
               <PaginationItem>
                 <PaginationPrevious
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  className={page === 0 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={!hasPrevPage ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
+
+              {/* Page 1 */}
               {page > 1 && (
                 <PaginationItem>
                   <PaginationLink className='cursor-pointer' onClick={() => setPage(0)}>
@@ -615,9 +661,11 @@ export default function Dashboard() {
               )}
               {page > 2 && (
                 <PaginationItem>
-                  <span className='px-2 text-muted-foreground'>…</span>
+                  <PaginationEllipsis />
                 </PaginationItem>
               )}
+
+              {/* Previous page */}
               {page > 0 && (
                 <PaginationItem>
                   <PaginationLink className='cursor-pointer' onClick={() => setPage(page - 1)}>
@@ -625,27 +673,64 @@ export default function Dashboard() {
                   </PaginationLink>
                 </PaginationItem>
               )}
+
+              {/* Current page */}
               <PaginationItem>
                 <PaginationLink isActive>{page + 1}</PaginationLink>
               </PaginationItem>
-              {orders.length >= pageSize && (
+
+              {/* Next page */}
+              {hasNextPage && (
                 <PaginationItem>
                   <PaginationLink className='cursor-pointer' onClick={() => setPage(page + 1)}>
                     {page + 2}
                   </PaginationLink>
                 </PaginationItem>
               )}
+
+              {/* Ellipsis + last page */}
+              {lastPage >= 0 && page < lastPage - 1 && (
+                <>
+                  {page < lastPage - 2 && (
+                    <PaginationItem>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  )}
+                  <PaginationItem>
+                    <PaginationLink className='cursor-pointer' onClick={() => setPage(lastPage)}>
+                      {lastPage + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                </>
+              )}
+
+              {/* Next */}
               <PaginationItem>
                 <PaginationNext
                   onClick={() => setPage((p) => p + 1)}
-                  className={orders.length < pageSize ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={!hasNextPage ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
+              {/* Last page */}
+              {lastPage >= 0 && (
+                <PaginationItem>
+                  <button
+                    onClick={() => setPage(lastPage)}
+                    disabled={page >= lastPage}
+                    className={`inline-flex items-center justify-center h-9 w-9 rounded-md text-sm ${page >= lastPage ? 'pointer-events-none opacity-50' : 'hover:bg-muted cursor-pointer'}`}
+                    title='Last'
+                  >
+                    <ChevronsRight size={16} />
+                  </button>
+                </PaginationItem>
+              )}
             </PaginationContent>
           </Pagination>
 
-          <span className='text-xs text-muted-foreground'>
-            {orders.length} {t('dash.page.showing')}
+          {/* Page info */}
+          <span className='text-xs text-muted-foreground whitespace-nowrap'>
+            {t('dash.page.label')} {page + 1}
+            {totalPages > 0 ? ` / ${totalPages}` : ''}
           </span>
         </div>
       </main>
