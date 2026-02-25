@@ -26,9 +26,9 @@ const translations = {
     'dash.subtitle': 'Керування замовленнями та розрахунок податків',
     'dash.signout': 'Вийти',
     'dash.admin': 'Адмін',
-    'dash.stats.orders': 'Всього замовлень',
+    'dash.stats.orders': 'Всього замовлень на стор.',
     'dash.stats.tax': 'Зібрано податків',
-    'dash.stats.pending': 'Неоплачено (на стор.)',
+    'dash.stats.pending': 'Неоплачено на стор.',
 
     // Dashboard — orders table
     'dash.orders.id': 'ID',
@@ -167,9 +167,9 @@ const translations = {
     'dash.subtitle': 'Manage orders and tax calculations',
     'dash.signout': 'Sign Out',
     'dash.admin': 'Admin',
-    'dash.stats.orders': 'Total Orders',
+    'dash.stats.orders': 'Total Orders on page',
     'dash.stats.tax': 'Tax Collected',
-    'dash.stats.pending': 'Unpaid (on page)',
+    'dash.stats.pending': 'Unpaid on page',
 
     'dash.orders.id': 'ID',
     'dash.orders.email': 'Email',

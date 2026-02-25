@@ -632,17 +632,6 @@ export default function Dashboard() {
 
           <Pagination className='mx-0 w-auto'>
             <PaginationContent>
-              {/* First page */}
-              <PaginationItem>
-                <button
-                  onClick={() => setPage(0)}
-                  disabled={!hasPrevPage}
-                  className={`inline-flex items-center justify-center h-9 w-9 rounded-md text-sm ${!hasPrevPage ? 'pointer-events-none opacity-50' : 'hover:bg-muted cursor-pointer'}`}
-                  title='First'
-                >
-                  <ChevronsLeft size={16} />
-                </button>
-              </PaginationItem>
               {/* Previous */}
               <PaginationItem>
                 <PaginationPrevious
