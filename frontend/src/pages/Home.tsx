@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom'
 import { useI18n } from '../context/I18nContext'
 import { Button } from '@/components/ui/button'
+import { KIT_INFO } from '../services/api'
 
 import silverImg from '@/assets/silver.jpg'
 import goldImg from '@/assets/gold.jpg'
 import platinumImg from '@/assets/platinum.jpg'
 
-const KITS = [
-  { id: 'KIT_SILVER', img: silverImg },
-  { id: 'KIT_GOLD', img: goldImg },
-  { id: 'KIT_PLATINUM', img: platinumImg },
-] as const
+const SHOWCASE = [
+  { id: 'SILVER' as const, img: silverImg },
+  { id: 'GOLD' as const, img: goldImg },
+  { id: 'PLATINUM' as const, img: platinumImg },
+]
 
 export default function Home() {
   const { t } = useI18n()
@@ -30,8 +31,8 @@ export default function Home() {
           New York State
         </div>
 
-        <h1 className='text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-4'>{t('pub.hero.title')}</h1>
-        <p className='text-lg text-muted-foreground mb-8 max-w-lg mx-auto'>{t('pub.hero.subtitle')}</p>
+        <h1 className='text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-4'>{t('pub.hero.title')}</h1>
+        <p className='text-base sm:text-lg text-muted-foreground mb-8 max-w-lg mx-auto'>{t('pub.hero.subtitle')}</p>
 
         <div className='flex items-center justify-center gap-3'>
           <Button
@@ -47,9 +48,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Kit cards with real images */}
-      <div className='grid grid-cols-1 sm:grid-cols-3 gap-5 mt-20 max-w-3xl w-full'>
-        {KITS.map(({ id, img }) => (
+      {/* Kit cards */}
+      <div className='grid grid-cols-1 sm:grid-cols-3 gap-5 mt-16 sm:mt-20 max-w-3xl w-full pb-12'>
+        {SHOWCASE.map(({ id, img }) => (
           <Link
             key={id}
             to='/order'
@@ -61,7 +62,7 @@ export default function Home() {
             <div className='absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent' />
             <div className='absolute bottom-0 left-0 right-0 p-4'>
               <h3 className='font-semibold text-white text-lg drop-shadow-lg'>{t(`order.kit.${id}` as any)}</h3>
-              <p className='text-white/70 text-sm'>Wellness Kit</p>
+              <p className='text-white/70 text-sm'>from ${KIT_INFO[id].price}</p>
             </div>
           </Link>
         ))}

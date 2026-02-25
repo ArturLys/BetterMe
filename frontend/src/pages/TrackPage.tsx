@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useI18n } from '../context/I18nContext'
 import { useToast } from '../context/ToastContext'
-import { api, type Order } from '../services/api'
+import { api, type Order, KIT_INFO, type KitType } from '../services/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,7 +30,9 @@ export default function TrackPage() {
     setLoading(true)
     setSearched(true)
     try {
-      const data = await api.orders.getById(orderId.trim())
+      const id = parseInt(orderId.trim(), 10)
+      if (isNaN(id)) throw new Error('Invalid ID')
+      const data = await api.orders.getById(id)
       setOrder(data)
     } catch {
       setOrder(null)
@@ -40,8 +42,12 @@ export default function TrackPage() {
     }
   }
 
+  const progress = order?.deliveryProgress ?? 0
+  const payment = order?.paymentStatus ?? '—'
+  const kitLabel = order ? (KIT_INFO[order.kitType as KitType]?.label ?? order.kitType) : ''
+
   return (
-    <main className='max-w-lg mx-auto p-6 mt-8'>
+    <main className='max-w-lg mx-auto p-4 sm:p-6 mt-8'>
       <Card className='backdrop-blur-sm bg-card/80 mb-6'>
         <CardHeader>
           <CardTitle className='text-2xl'>{t('track.title')}</CardTitle>
@@ -78,8 +84,10 @@ export default function TrackPage() {
         <Card className='overflow-hidden animate-[fadeIn_0.3s_ease-out]'>
           <CardHeader className='pb-3'>
             <div className='flex items-center justify-between'>
-              <CardTitle className='text-lg font-mono'>{order.id.slice(0, 8)}...</CardTitle>
-              <Badge className={`${STATUS_COLORS[order.orderStatus] || ''} border`}>{order.orderStatus.replace(/_/g, ' ')}</Badge>
+              <CardTitle className='text-lg font-mono'>#{order.id}</CardTitle>
+              <Badge className={`${STATUS_COLORS[order.orderStatus] || ''} border`}>
+                {t(`dash.status.${order.orderStatus.toLowerCase()}` as any) || order.orderStatus.replace(/_/g, ' ')}
+              </Badge>
             </div>
           </CardHeader>
           <CardContent className='space-y-4'>
@@ -87,12 +95,12 @@ export default function TrackPage() {
             <div>
               <div className='flex justify-between text-xs text-muted-foreground mb-1'>
                 <span>{t('track.progress')}</span>
-                <span>{order.deliveryProgress}%</span>
+                <span>{progress}%</span>
               </div>
               <div className='h-2 rounded-full bg-muted overflow-hidden'>
                 <div
                   className='h-full rounded-full bg-linear-to-r from-emerald-500 to-teal-500 transition-all duration-500'
-                  style={{ width: `${order.deliveryProgress}%` }}
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
@@ -101,19 +109,19 @@ export default function TrackPage() {
             <div className='grid grid-cols-2 gap-3 text-sm'>
               <div>
                 <span className='text-muted-foreground'>{t('track.kit')}</span>
-                <p className='font-medium'>{order.kitType.replace(/_/g, ' ')}</p>
+                <p className='font-medium'>{kitLabel}</p>
               </div>
               <div>
                 <span className='text-muted-foreground'>{t('track.payment')}</span>
-                <p className='font-medium'>{order.paymentStatus.replace(/_/g, ' ')}</p>
+                <p className='font-medium'>{payment.replace(/_/g, ' ')}</p>
               </div>
               <div>
                 <span className='text-muted-foreground'>{t('track.placed')}</span>
-                <p className='font-medium'>{order.timestamp}</p>
+                <p className='font-medium'>{order.timestamp?.slice(0, 10) ?? '—'}</p>
               </div>
               <div>
-                <span className='text-muted-foreground'>{t('track.delivered')}</span>
-                <p className='font-medium'>{order.deliveredAt || '—'}</p>
+                <span className='text-muted-foreground'>{t('dash.orders.subtotal')}</span>
+                <p className='font-medium'>${order.subtotal}</p>
               </div>
             </div>
           </CardContent>

@@ -1,22 +1,20 @@
 import { useState } from 'react'
 import { useI18n } from '../context/I18nContext'
 import { useToast } from '../context/ToastContext'
-import { api } from '../services/api'
+import { api, ALL_KIT_TYPES, KIT_INFO, type KitType } from '../services/api'
 import LocationPicker from '@/components/LocationPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Package, Award, Trophy, Crown, Plus, Check } from 'lucide-react'
 
 import silverImg from '@/assets/silver.jpg'
 import goldImg from '@/assets/gold.jpg'
 import platinumImg from '@/assets/platinum.jpg'
 
-const KITS = [
-  { id: 'KIT_SILVER', img: silverImg },
-  { id: 'KIT_GOLD', img: goldImg },
-  { id: 'KIT_PLATINUM', img: platinumImg },
-] as const
+const TIER_IMAGES: Record<string, string | null> = { default: null, silver: silverImg, gold: goldImg, platinum: platinumImg }
+const TIER_ICONS: Record<string, typeof Package> = { default: Package, silver: Award, gold: Trophy, platinum: Crown }
 
 export default function OrderPage() {
   const { t } = useI18n()
@@ -26,13 +24,13 @@ export default function OrderPage() {
     email: '',
     latitude: '',
     longitude: '',
-    kitType: 'KIT_SILVER' as string,
+    kitType: 'SILVER' as KitType,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.latitude || !form.longitude) {
-      toast('Please pick a delivery location', 'error')
+      toast(t('order.location.required' as any), 'error')
       return
     }
     setLoading(true)
@@ -44,7 +42,7 @@ export default function OrderPage() {
         kitType: form.kitType,
       })
       toast(t('order.success'), 'success')
-      setForm({ email: '', latitude: '', longitude: '', kitType: 'KIT_SILVER' })
+      setForm({ email: '', latitude: '', longitude: '', kitType: 'SILVER' })
     } catch (err: any) {
       toast(err.message, 'error')
     } finally {
@@ -53,7 +51,7 @@ export default function OrderPage() {
   }
 
   return (
-    <main className='max-w-2xl mx-auto p-6 mt-8'>
+    <main className='max-w-2xl mx-auto p-4 sm:p-6 mt-8'>
       <Card className='backdrop-blur-sm bg-card/80'>
         <CardHeader>
           <CardTitle className='text-2xl'>{t('order.title')}</CardTitle>
@@ -73,39 +71,58 @@ export default function OrderPage() {
               />
             </div>
 
-            {/* Kit selector */}
+            {/* Kit selector — image cards with plus badge */}
             <div className='space-y-2'>
               <Label>{t('order.kit')}</Label>
-              <div className='grid grid-cols-3 gap-3'>
-                {KITS.map(({ id, img }) => (
-                  <button
-                    key={id}
-                    type='button'
-                    onClick={() => setForm({ ...form, kitType: id })}
-                    className={`relative rounded-xl overflow-hidden border-2 transition-all duration-200 group ${
-                      form.kitType === id
-                        ? 'border-emerald-500 shadow-lg shadow-emerald-500/20 scale-[1.02]'
-                        : 'border-transparent hover:border-border opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <img src={img} alt={id} className='w-full h-28 object-cover' />
-                    <div className='absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent' />
-                    <span className='absolute bottom-2 left-0 right-0 text-center text-white text-sm font-semibold drop-shadow-lg'>
-                      {t(`order.kit.${id}` as any)}
-                    </span>
-                    {form.kitType === id && (
-                      <div className='absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shadow'>
-                        <svg className='w-3 h-3 text-white' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={3}>
-                          <path strokeLinecap='round' strokeLinejoin='round' d='M5 13l4 4L19 7' />
-                        </svg>
+              <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+                {ALL_KIT_TYPES.map((kit) => {
+                  const info = KIT_INFO[kit]
+                  const img = TIER_IMAGES[info.tier]
+                  const Icon = TIER_ICONS[info.tier] || Package
+                  const selected = form.kitType === kit
+                  return (
+                    <button
+                      key={kit}
+                      type='button'
+                      onClick={() => setForm({ ...form, kitType: kit })}
+                      className={`relative flex flex-col rounded-xl overflow-hidden border-2 transition-all duration-200 group ${
+                        selected
+                          ? 'border-emerald-500 shadow-lg shadow-emerald-500/10 scale-[1.02]'
+                          : 'border-border hover:border-emerald-500/30 opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={info.label}
+                          className='w-full h-20 object-cover transition-transform duration-500 group-hover:scale-110'
+                        />
+                      ) : (
+                        <div className='w-full h-20 bg-muted flex items-center justify-center'>
+                          <Icon size={28} className='text-muted-foreground' />
+                        </div>
+                      )}
+                      <div className='absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent' />
+                      <div className='absolute bottom-0 left-0 right-0 p-2 text-center'>
+                        <span className='text-white text-xs font-semibold drop-shadow-lg block'>{t(`order.kit.${kit}` as any)}</span>
+                        <span className='text-white/70 text-[10px]'>${info.price}</span>
                       </div>
-                    )}
-                  </button>
-                ))}
+                      {info.plus && (
+                        <div className='absolute top-1 right-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shadow'>
+                          <Plus size={12} className='text-white' strokeWidth={3} />
+                        </div>
+                      )}
+                      {selected && (
+                        <div className='absolute top-1 left-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shadow'>
+                          <Check size={12} className='text-white' strokeWidth={3} />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Location picker (reusable) */}
             <LocationPicker
               latitude={form.latitude}
               longitude={form.longitude}

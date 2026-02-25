@@ -1,18 +1,33 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
+export type KitType = 'DEFAULT' | 'DEFAULT_PLUS' | 'SILVER' | 'SILVER_PLUS' | 'GOLD' | 'GOLD_PLUS' | 'PLATINUM' | 'PLATINUM_PLUS'
+
+export const KIT_INFO: Record<KitType, { label: string; price: number; tier: 'default' | 'silver' | 'gold' | 'platinum'; plus: boolean }> = {
+  DEFAULT: { label: 'Default', price: 22, tier: 'default', plus: false },
+  DEFAULT_PLUS: { label: 'Default+', price: 25, tier: 'default', plus: true },
+  SILVER: { label: 'Silver', price: 45, tier: 'silver', plus: false },
+  SILVER_PLUS: { label: 'Silver+', price: 50, tier: 'silver', plus: true },
+  GOLD: { label: 'Gold', price: 108, tier: 'gold', plus: false },
+  GOLD_PLUS: { label: 'Gold+', price: 120, tier: 'gold', plus: true },
+  PLATINUM: { label: 'Platinum', price: 180, tier: 'platinum', plus: false },
+  PLATINUM_PLUS: { label: 'Platinum+', price: 200, tier: 'platinum', plus: true },
+}
+
+export const ALL_KIT_TYPES = Object.keys(KIT_INFO) as KitType[]
+
 export interface Order {
-  id: string
-  receiverEmail: string
+  id: number
+  receiverEmail: string | null
   latitude: number
   longitude: number
-  distance: number
+  distance?: number
   subtotal: number
   timestamp: string
-  deliveredAt: string | null
-  kitType: 'DEFAULT' | 'KIT_SILVER' | 'KIT_GOLD' | 'KIT_PLATINUM'
-  orderStatus: 'ORDERED' | 'ON_THE_WAY' | 'RETURNING' | 'DELIVERED' | 'RECEIVED' | 'WAITING_FOR_PAYMENT'
-  paymentStatus: 'NOT_PAID' | 'PAID'
-  deliveryProgress: number
+  deliveredAt?: string | null
+  kitType: KitType
+  orderStatus: string
+  paymentStatus?: string
+  deliveryProgress?: number
 }
 
 export interface OrderCreateDTO {
@@ -38,12 +53,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   orders: {
     list: (filters?: Record<string, string>) => {
-      const params = new URLSearchParams(filters).toString()
-      return request<Order[]>(`/orders${params ? `?${params}` : ''}`)
+      const p = { size: '20', ...filters }
+      const params = new URLSearchParams(p).toString()
+      return request<Order[]>(`/orders?${params}`)
     },
-    getById: (id: string) => request<Order>(`/orders/${id}`),
+    getById: (id: number) => request<Order>(`/orders/${id}`),
     create: (dto: OrderCreateDTO) => request<void>('/orders', { method: 'POST', body: JSON.stringify(dto) }),
-    setPaid: (id: string) => request<void>(`/orders/${id}`, { method: 'PATCH' }),
-    delete: (id: string) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
+    setPaid: (id: number) => request<void>(`/orders/${id}`, { method: 'PATCH' }),
+    delete: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
   },
 }

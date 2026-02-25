@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../context/I18nContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
-import { api, type Order } from '../../services/api'
+import { api, type Order, type KitType, KIT_INFO, ALL_KIT_TYPES } from '../../services/api'
 import LocationPicker from '@/components/LocationPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,8 +14,33 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from '@/components/ui/pagination'
+import {
+  Package,
+  Award,
+  Trophy,
+  Crown,
+  Plus,
+  Pencil,
+  Map,
+  Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  RefreshCw,
+  Upload,
+  PlusCircle,
+  Sun,
+  Moon,
+  ChevronDown,
+  X,
+} from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+
+import silverImg from '@/assets/silver.jpg'
+import goldImg from '@/assets/gold.jpg'
+import platinumImg from '@/assets/platinum.jpg'
 
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -22,6 +48,9 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
+
+const TIER_IMAGES: Record<string, string | null> = { default: null, silver: silverImg, gold: goldImg, platinum: platinumImg }
+const TIER_ICONS: Record<string, typeof Package> = { default: Package, silver: Award, gold: Trophy, platinum: Crown }
 
 const STATUS_COLORS: Record<string, string> = {
   ORDERED: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -31,39 +60,44 @@ const STATUS_COLORS: Record<string, string> = {
   RECEIVED: 'bg-green-500/10 text-green-500 border-green-500/20',
   WAITING_FOR_PAYMENT: 'bg-red-500/10 text-red-500 border-red-500/20',
 }
-const PAYMENT_COLORS: Record<string, string> = {
-  PAID: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-  NOT_PAID: 'bg-red-500/10 text-red-500 border-red-500/20',
-}
 
-type SortField = 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'paymentStatus' | 'deliveryProgress'
+type SortField = 'id' | 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'subtotal'
 type SortDir = 'asc' | 'desc'
+
+const PAGE_SIZES = [10, 20, 50, 100] as const
+
+function KitIcon({ kit, size = 16 }: { kit: KitType; size?: number }) {
+  const info = KIT_INFO[kit]
+  if (!info) return <Package size={size} />
+  const Icon = TIER_ICONS[info.tier] || Package
+  return (
+    <span className='relative inline-flex'>
+      <Icon size={size} />
+      {info.plus && <Plus size={size * 0.5} className='absolute -top-1 -right-1.5 text-emerald-500' strokeWidth={3} />}
+    </span>
+  )
+}
 
 export default function Dashboard() {
   const { user, signOut } = useAuth()
   const { t, lang, setLang } = useI18n()
   const { theme, toggleTheme } = useTheme()
   const { toast } = useToast()
+  const qc = useQueryClient()
 
   const [langOpen, setLangOpen] = useState(false)
   const langRef = useRef<HTMLDivElement>(null)
 
-  // Orders
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState<number>(20)
 
-  // Sorting
-  const [sortField, setSortField] = useState<SortField>('timestamp')
+  const [sortField, setSortField] = useState<SortField>('id')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
-  // Filters
   const [filterStatus, setFilterStatus] = useState('')
   const [filterEmail, setFilterEmail] = useState('')
   const [filterKit, setFilterKit] = useState('')
 
-  // Dialogs
   const [csvOpen, setCsvOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -73,15 +107,12 @@ export default function Dashboard() {
   const [mapOrder, setMapOrder] = useState<Order | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null)
 
-  // Create form
-  const [createForm, setCreateForm] = useState({ email: '', latitude: '', longitude: '', kitType: 'KIT_SILVER' })
+  const [createForm, setCreateForm] = useState({ email: '', latitude: '', longitude: '', kitType: 'SILVER' as KitType })
   const [createLoading, setCreateLoading] = useState(false)
 
-  // CSV
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvLoading, setCsvLoading] = useState(false)
 
-  // Close lang dropdown
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false)
@@ -90,29 +121,39 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Load orders
-  const loadOrders = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const filters: Record<string, string> = { page: String(page) }
-      if (filterStatus) filters.orderStatus = filterStatus
-      if (filterEmail) filters.email = filterEmail
-      if (filterKit) filters.kitType = filterKit
-      const data = await api.orders.list(filters)
-      setOrders(data)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [page, filterStatus, filterEmail, filterKit])
+  // Backend always returns 10 per page regardless of `size` param.
+  // To show more, we fetch multiple backend pages in parallel.
+  const BACKEND_PAGE_SIZE = 10
+  const pagesNeeded = Math.ceil(pageSize / BACKEND_PAGE_SIZE)
 
-  useEffect(() => {
-    loadOrders()
-  }, [loadOrders])
+  const queryKey = ['orders', page, pageSize, filterStatus, filterEmail, filterKit]
 
-  // Sort
+  const {
+    data: orders = [],
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const baseFilters: Record<string, string> = {}
+      if (filterStatus) baseFilters.orderStatus = filterStatus
+      if (filterEmail) baseFilters.email = filterEmail
+      if (filterKit) baseFilters.kitType = filterKit
+
+      const startPage = page * pagesNeeded
+      const fetches = Array.from({ length: pagesNeeded }, (_, i) =>
+        api.orders.list({ ...baseFilters, page: String(startPage + i), size: '10', sort: 'id,desc' })
+      )
+      const results = await Promise.all(fetches)
+      return results.flatMap((r) => (Array.isArray(r) ? r : []))
+    },
+    placeholderData: (prev) => prev,
+  })
+
+  const error = queryError ? (queryError as Error).message : null
+
+  // ---- Sorting (client-side on current page) ----
   const sortedOrders = [...orders].sort((a, b) => {
     const av = a[sortField] ?? ''
     const bv = b[sortField] ?? ''
@@ -121,19 +162,19 @@ export default function Dashboard() {
   })
 
   const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
+    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
       setSortField(field)
       setSortDir('asc')
     }
   }
 
-  const SortIcon = ({ field }: { field: SortField }) => (
-    <span className='inline-block ml-1 text-xs opacity-50'>{sortField === field ? (sortDir === 'asc' ? '↑' : '↓') : '⇅'}</span>
-  )
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown size={12} className='inline ml-1 opacity-40' />
+    return sortDir === 'asc' ? <ArrowUp size={12} className='inline ml-1' /> : <ArrowDown size={12} className='inline ml-1' />
+  }
 
-  // Actions
+  // ---- Actions ----
   const confirmDelete = (order: Order) => {
     setDeleteTarget(order)
     setDeleteOpen(true)
@@ -143,8 +184,8 @@ export default function Dashboard() {
     if (!deleteTarget) return
     try {
       await api.orders.delete(deleteTarget.id)
-      setOrders((prev) => prev.filter((o) => o.id !== deleteTarget.id))
       toast(t('dash.orders.deleted'), 'success')
+      qc.invalidateQueries({ queryKey: ['orders'] })
     } catch (err: any) {
       toast(err.message, 'error')
     }
@@ -154,14 +195,12 @@ export default function Dashboard() {
 
   const handleTogglePaid = async (order: Order) => {
     try {
-      if (order.paymentStatus === 'NOT_PAID') {
+      if ((order.paymentStatus ?? 'NOT_PAID') === 'NOT_PAID') {
         await api.orders.setPaid(order.id)
-        setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, paymentStatus: 'PAID' as const } : o)))
         toast(t('dash.orders.paid'), 'success')
+        qc.invalidateQueries({ queryKey: ['orders'] })
       } else {
-        // Backend doesn't support "unpay" — we just update locally for now
-        setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, paymentStatus: 'NOT_PAID' as const } : o)))
-        toast('Marked as unpaid (local)', 'info')
+        toast(t('dash.orders.unpaid'), 'info')
       }
     } catch (err: any) {
       toast(err.message, 'error')
@@ -179,8 +218,8 @@ export default function Dashboard() {
       })
       toast(t('order.success'), 'success')
       setCreateOpen(false)
-      setCreateForm({ email: '', latitude: '', longitude: '', kitType: 'KIT_SILVER' })
-      loadOrders()
+      setCreateForm({ email: '', latitude: '', longitude: '', kitType: 'SILVER' as KitType })
+      qc.invalidateQueries({ queryKey: ['orders'] })
     } catch (err: any) {
       toast(err.message, 'error')
     } finally {
@@ -197,10 +236,10 @@ export default function Dashboard() {
       const API_URL = import.meta.env.VITE_API_URL || '/api'
       const res = await fetch(`${API_URL}/orders/import`, { method: 'POST', body: formData })
       if (!res.ok) throw new Error(await res.text())
-      toast('CSV imported!', 'success')
+      toast(t('dash.csv.success'), 'success')
       setCsvOpen(false)
       setCsvFile(null)
-      loadOrders()
+      qc.invalidateQueries({ queryKey: ['orders'] })
     } catch (err: any) {
       toast(err.message, 'error')
     } finally {
@@ -216,17 +255,20 @@ export default function Dashboard() {
   const handleEditSave = async () => {
     if (!editOrder) return
     try {
-      if (editOrder.paymentStatus === 'PAID') {
-        await api.orders.setPaid(editOrder.id)
-      }
-      setOrders((prev) => prev.map((o) => (o.id === editOrder.id ? editOrder : o)))
-      toast('Saved', 'success')
+      if (editOrder.paymentStatus === 'PAID') await api.orders.setPaid(editOrder.id)
+      toast(t('dash.edit.saved'), 'success')
       setEditOpen(false)
+      qc.invalidateQueries({ queryKey: ['orders'] })
     } catch (err: any) {
       toast(err.message, 'error')
     }
   }
 
+  const kitLabel = (kit: string) => KIT_INFO[kit as KitType]?.label ?? kit
+
+  // ═══════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════
   return (
     <div className='min-h-screen bg-background'>
       {/* Header */}
@@ -242,21 +284,16 @@ export default function Dashboard() {
             </Badge>
           </div>
           <div className='flex items-center gap-2'>
-            {/* Theme toggle — pill style */}
             <button
               onClick={toggleTheme}
               className='relative w-12 h-6 rounded-full bg-muted border border-border transition-colors duration-300 hover:border-emerald-500/30'
             >
               <div
-                className={`absolute top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-xs transition-all duration-300 shadow-sm ${
-                  theme === 'dark' ? 'left-6 bg-indigo-500 shadow-indigo-500/30' : 'left-0.5 bg-amber-400 shadow-amber-400/30'
-                }`}
+                className={`absolute top-0.5 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${theme === 'dark' ? 'left-6 bg-indigo-500 shadow-indigo-500/30' : 'left-0.5 bg-amber-400 shadow-amber-400/30'}`}
               >
-                {theme === 'dark' ? '🌙' : '☀️'}
+                {theme === 'dark' ? <Moon size={12} className='text-white' /> : <Sun size={12} className='text-white' />}
               </div>
             </button>
-
-            {/* Language dropdown */}
             <div className='relative' ref={langRef}>
               <button
                 onClick={() => setLangOpen(!langOpen)}
@@ -264,15 +301,7 @@ export default function Dashboard() {
               >
                 <span>{lang === 'uk' ? '🇺🇦' : '🇬🇧'}</span>
                 <span className='text-xs font-medium'>{lang.toUpperCase()}</span>
-                <svg
-                  className={`w-3 h-3 transition-transform duration-200 ${langOpen ? 'rotate-180' : ''}`}
-                  fill='none'
-                  viewBox='0 0 24 24'
-                  stroke='currentColor'
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap='round' strokeLinejoin='round' d='M19 9l-7 7-7-7' />
-                </svg>
+                <ChevronDown size={12} className={`transition-transform duration-200 ${langOpen ? 'rotate-180' : ''}`} />
               </button>
               {langOpen && (
                 <div className='absolute right-0 mt-1 w-36 rounded-lg border bg-popover shadow-lg py-1 animate-[fadeIn_0.15s_ease-out]'>
@@ -297,7 +326,6 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-
             <div className='w-px h-5 bg-border' />
             <span className='text-sm text-muted-foreground hidden sm:inline'>{user?.email}</span>
             <Button variant='ghost' size='sm' onClick={signOut}>
@@ -315,10 +343,10 @@ export default function Dashboard() {
           </div>
           <div className='flex gap-2'>
             <Button variant='outline' size='sm' onClick={() => setCsvOpen(true)}>
-              📄 CSV
+              <Upload size={14} className='mr-1' /> CSV
             </Button>
             <Button size='sm' onClick={() => setCreateOpen(true)} className='bg-linear-to-r from-emerald-600 to-teal-600 text-white'>
-              ➕ Order
+              <PlusCircle size={14} className='mr-1' /> {t('dash.create.btn')}
             </Button>
           </div>
         </div>
@@ -330,7 +358,9 @@ export default function Dashboard() {
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.orders')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-3xl font-bold'>{orders.length}</p>
+              <p className='text-3xl font-bold'>
+                {t('dash.page.label')} {page + 1}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -346,7 +376,7 @@ export default function Dashboard() {
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.pending')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-3xl font-bold'>{orders.filter((o) => o.paymentStatus === 'NOT_PAID').length}</p>
+              <p className='text-3xl font-bold'>{orders.filter((o) => (o.paymentStatus ?? 'NOT_PAID') === 'NOT_PAID').length}</p>
             </CardContent>
           </Card>
         </div>
@@ -356,7 +386,7 @@ export default function Dashboard() {
         {/* Filters */}
         <div className='flex flex-wrap items-end gap-2 sm:gap-3 mb-4 overflow-x-auto pb-1'>
           <div className='space-y-1'>
-            <Label className='text-xs text-muted-foreground'>Status</Label>
+            <Label className='text-xs text-muted-foreground'>{t('dash.orders.status')}</Label>
             <select
               value={filterStatus}
               onChange={(e) => {
@@ -365,16 +395,16 @@ export default function Dashboard() {
               }}
               className='h-9 px-3 rounded-md border bg-background text-sm'
             >
-              <option value=''>All</option>
-              <option value='ORDERED'>Ordered</option>
-              <option value='ON_THE_WAY'>On the way</option>
-              <option value='DELIVERED'>Delivered</option>
-              <option value='RECEIVED'>Received</option>
-              <option value='WAITING_FOR_PAYMENT'>Waiting payment</option>
+              <option value=''>{t('dash.filter.all')}</option>
+              <option value='ORDERED'>{t('dash.status.ordered')}</option>
+              <option value='ON_THE_WAY'>{t('dash.status.on_the_way')}</option>
+              <option value='DELIVERED'>{t('dash.status.delivered')}</option>
+              <option value='RECEIVED'>{t('dash.status.received')}</option>
+              <option value='WAITING_FOR_PAYMENT'>{t('dash.status.waiting')}</option>
             </select>
           </div>
           <div className='space-y-1'>
-            <Label className='text-xs text-muted-foreground'>Kit</Label>
+            <Label className='text-xs text-muted-foreground'>{t('dash.orders.kit')}</Label>
             <select
               value={filterKit}
               onChange={(e) => {
@@ -383,15 +413,17 @@ export default function Dashboard() {
               }}
               className='h-9 px-3 rounded-md border bg-background text-sm'
             >
-              <option value=''>All</option>
-              <option value='KIT_SILVER'>Silver</option>
-              <option value='KIT_GOLD'>Gold</option>
-              <option value='KIT_PLATINUM'>Platinum</option>
+              <option value=''>{t('dash.filter.all')}</option>
+              {ALL_KIT_TYPES.map((k) => (
+                <option key={k} value={k}>
+                  {KIT_INFO[k].label}
+                </option>
+              ))}
             </select>
           </div>
           <div className='space-y-1'>
-            <Label className='text-xs text-muted-foreground'>Email</Label>
-            <Input placeholder='filter...' value={filterEmail} onChange={(e) => setFilterEmail(e.target.value)} className='h-9 w-44' />
+            <Label className='text-xs text-muted-foreground'>{t('dash.orders.email')}</Label>
+            <Input placeholder={t('dash.filter.search')} value={filterEmail} onChange={(e) => setFilterEmail(e.target.value)} className='h-9 w-44' />
           </div>
           <Button
             variant='outline'
@@ -403,11 +435,11 @@ export default function Dashboard() {
               setPage(0)
             }}
           >
-            Clear
+            <X size={14} className='mr-1' /> {t('dash.filter.clear')}
           </Button>
           <div className='ml-auto'>
-            <Button variant='outline' size='sm' onClick={loadOrders} disabled={loading}>
-              ↻
+            <Button variant='outline' size='sm' onClick={() => refetch()} disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </Button>
           </div>
         </div>
@@ -432,107 +464,108 @@ export default function Dashboard() {
                 <table className='w-full text-sm'>
                   <thead>
                     <tr className='border-b bg-muted/30'>
-                      <th className='text-left px-3 py-3 font-medium text-muted-foreground'>ID</th>
+                      <th
+                        className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
+                        onClick={() => toggleSort('id')}
+                      >
+                        ID
+                        <SortIcon field='id' />
+                      </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('receiverEmail')}
                       >
-                        Email
+                        {t('dash.orders.email')}
                         <SortIcon field='receiverEmail' />
                       </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('kitType')}
                       >
-                        Kit
+                        {t('dash.orders.kit')}
                         <SortIcon field='kitType' />
                       </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('orderStatus')}
                       >
-                        Status
+                        {t('dash.orders.status')}
                         <SortIcon field='orderStatus' />
                       </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
-                        onClick={() => toggleSort('paymentStatus')}
+                        onClick={() => toggleSort('subtotal')}
                       >
-                        Payment
-                        <SortIcon field='paymentStatus' />
-                      </th>
-                      <th
-                        className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
-                        onClick={() => toggleSort('deliveryProgress')}
-                      >
-                        Progress
-                        <SortIcon field='deliveryProgress' />
+                        {t('dash.orders.subtotal')}
+                        <SortIcon field='subtotal' />
                       </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('timestamp')}
                       >
-                        Date
+                        {t('dash.orders.date')}
                         <SortIcon field='timestamp' />
                       </th>
-                      <th className='text-left px-3 py-3 font-medium text-muted-foreground'>Actions</th>
+                      <th className='text-left px-3 py-3 font-medium text-muted-foreground'>{t('dash.orders.payment')}</th>
+                      <th className='text-left px-3 py-3 font-medium text-muted-foreground'>{t('dash.orders.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedOrders.map((order) => (
                       <tr key={order.id} className='border-b last:border-0 hover:bg-muted/30 transition-colors'>
-                        <td className='px-3 py-3 font-mono text-xs'>{order.id.slice(0, 8)}…</td>
-                        <td className='px-3 py-3 text-xs'>{order.receiverEmail}</td>
-                        <td className='px-3 py-3 text-xs'>{order.kitType.replace(/_/g, ' ')}</td>
+                        <td className='px-3 py-3 font-mono text-xs'>{order.id}</td>
+                        <td className='px-3 py-3 text-xs'>{order.receiverEmail ?? '—'}</td>
+                        <td className='px-3 py-3 text-xs'>
+                          <span className='inline-flex items-center gap-1.5'>
+                            <KitIcon kit={order.kitType} size={14} />
+                            {kitLabel(order.kitType)}
+                          </span>
+                        </td>
                         <td className='px-3 py-3'>
                           <Badge variant='outline' className={`text-xs ${STATUS_COLORS[order.orderStatus] || ''}`}>
-                            {order.orderStatus.replace(/_/g, ' ')}
+                            {t(`dash.status.${order.orderStatus.toLowerCase()}` as any) || order.orderStatus.replace(/_/g, ' ')}
+                          </Badge>
+                        </td>
+                        <td className='px-3 py-3 text-xs font-mono'>${order.subtotal}</td>
+                        <td className='px-3 py-3 text-xs text-muted-foreground'>{order.timestamp?.slice(0, 10) ?? '—'}</td>
+                        <td className='px-3 py-3'>
+                          <Badge
+                            variant='outline'
+                            className={`text-xs cursor-pointer transition-colors ${
+                              (order.paymentStatus ?? 'NOT_PAID') === 'PAID'
+                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20'
+                                : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'
+                            }`}
+                            onClick={() => handleTogglePaid(order)}
+                          >
+                            {(order.paymentStatus ?? 'NOT_PAID') === 'PAID' ? t('dash.orders.paid') : t('dash.orders.not_paid')}
                           </Badge>
                         </td>
                         <td className='px-3 py-3'>
-                          <button onClick={() => handleTogglePaid(order)} title='Click to toggle'>
-                            <Badge
-                              variant='outline'
-                              className={`text-xs cursor-pointer hover:opacity-80 ${PAYMENT_COLORS[order.paymentStatus] || ''}`}
-                            >
-                              {order.paymentStatus.replace(/_/g, ' ')}
-                            </Badge>
-                          </button>
-                        </td>
-                        <td className='px-3 py-3'>
-                          <div className='flex items-center gap-2'>
-                            <div className='w-16 h-1.5 rounded-full bg-muted overflow-hidden'>
-                              <div className='h-full rounded-full bg-emerald-500' style={{ width: `${order.deliveryProgress}%` }} />
-                            </div>
-                            <span className='text-xs text-muted-foreground'>{order.deliveryProgress}%</span>
-                          </div>
-                        </td>
-                        <td className='px-3 py-3 text-xs text-muted-foreground'>{order.timestamp}</td>
-                        <td className='px-3 py-3'>
                           <div className='flex items-center gap-0.5'>
-                            <Button variant='ghost' size='sm' className='h-7 w-7 p-0' title='Edit' onClick={() => openEdit(order)}>
-                              ✏️
+                            <Button variant='ghost' size='sm' className='h-7 w-7 p-0' title={t('dash.edit.title')} onClick={() => openEdit(order)}>
+                              <Pencil size={14} />
                             </Button>
                             <Button
                               variant='ghost'
                               size='sm'
                               className='h-7 w-7 p-0'
-                              title='Map'
+                              title={t('dash.map.title')}
                               onClick={() => {
                                 setMapOrder(order)
                                 setMapOpen(true)
                               }}
                             >
-                              🗺️
+                              <Map size={14} />
                             </Button>
                             <Button
                               variant='ghost'
                               size='sm'
                               className='h-7 w-7 p-0 text-destructive'
-                              title='Delete'
+                              title={t('dash.delete.title')}
                               onClick={() => confirmDelete(order)}
                             >
-                              🗑
+                              <Trash2 size={14} />
                             </Button>
                           </div>
                         </td>
@@ -546,117 +579,209 @@ export default function Dashboard() {
         </Card>
 
         {/* Pagination */}
-        <div className='flex items-center justify-center gap-2 mt-4'>
-          <Button variant='outline' size='sm' disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-            ← Prev
-          </Button>
-          <span className='text-sm text-muted-foreground px-3'>Page {page + 1}</span>
-          <Button variant='outline' size='sm' disabled={orders.length < 10} onClick={() => setPage((p) => p + 1)}>
-            Next →
-          </Button>
+        <div className='flex flex-col sm:flex-row items-center justify-between gap-3 mt-4'>
+          <div className='flex items-center gap-2'>
+            <span className='text-sm text-muted-foreground'>{t('dash.page.size')}</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value))
+                setPage(0)
+              }}
+              className='h-8 px-2 rounded-md border bg-background text-sm'
+            >
+              {PAGE_SIZES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className={page === 0 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              {page > 1 && (
+                <PaginationItem>
+                  <PaginationLink className='cursor-pointer' onClick={() => setPage(0)}>
+                    1
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+              {page > 2 && (
+                <PaginationItem>
+                  <span className='px-2 text-muted-foreground'>…</span>
+                </PaginationItem>
+              )}
+              {page > 0 && (
+                <PaginationItem>
+                  <PaginationLink className='cursor-pointer' onClick={() => setPage(page - 1)}>
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+              <PaginationItem>
+                <PaginationLink isActive>{page + 1}</PaginationLink>
+              </PaginationItem>
+              {orders.length >= pageSize && (
+                <PaginationItem>
+                  <PaginationLink className='cursor-pointer' onClick={() => setPage(page + 1)}>
+                    {page + 2}
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => p + 1)}
+                  className={orders.length < pageSize ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+
+          <span className='text-xs text-muted-foreground'>
+            {orders.length} {t('dash.page.showing')}
+          </span>
         </div>
       </main>
 
-      {/* ═══════ Delete Confirmation Dialog ═══════ */}
+      {/* ═══ Delete Dialog ═══ */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className='max-w-sm'>
           <DialogHeader>
-            <DialogTitle className='text-destructive'>🗑 Delete Order</DialogTitle>
-            <DialogDescription>This action cannot be undone.</DialogDescription>
+            <DialogTitle className='text-destructive flex items-center gap-2'>
+              <Trash2 size={18} /> {t('dash.delete.title')}
+            </DialogTitle>
+            <DialogDescription>{t('dash.delete.desc')}</DialogDescription>
           </DialogHeader>
           {deleteTarget && (
             <div className='rounded-lg border bg-muted/30 p-4 space-y-2'>
               <div className='flex justify-between text-sm'>
                 <span className='text-muted-foreground'>ID</span>
-                <span className='font-mono text-xs'>{deleteTarget.id.slice(0, 16)}…</span>
+                <span className='font-mono text-xs'>{deleteTarget.id}</span>
               </div>
               <div className='flex justify-between text-sm'>
-                <span className='text-muted-foreground'>Email</span>
-                <span>{deleteTarget.receiverEmail}</span>
+                <span className='text-muted-foreground'>{t('dash.orders.email')}</span>
+                <span>{deleteTarget.receiverEmail ?? '—'}</span>
               </div>
               <div className='flex justify-between text-sm'>
-                <span className='text-muted-foreground'>Kit</span>
-                <span>{deleteTarget.kitType.replace(/_/g, ' ')}</span>
+                <span className='text-muted-foreground'>{t('dash.orders.kit')}</span>
+                <span className='inline-flex items-center gap-1'>
+                  <KitIcon kit={deleteTarget.kitType} size={14} /> {kitLabel(deleteTarget.kitType)}
+                </span>
               </div>
             </div>
           )}
           <DialogFooter>
             <Button variant='outline' onClick={() => setDeleteOpen(false)}>
-              Cancel
+              {t('dash.btn.cancel')}
             </Button>
             <Button variant='destructive' onClick={handleDelete}>
-              Delete
+              {t('dash.btn.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══════ CSV Import Dialog ═══════ */}
+      {/* ═══ CSV Import Dialog ═══ */}
       <Dialog open={csvOpen} onOpenChange={setCsvOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>📄 Import CSV</DialogTitle>
-            <DialogDescription>Upload CSV (latitude, longitude, subtotal, timestamp)</DialogDescription>
+            <DialogTitle className='flex items-center gap-2'>
+              <Upload size={18} /> {t('dash.csv.title')}
+            </DialogTitle>
+            <DialogDescription>{t('dash.csv.desc')}</DialogDescription>
           </DialogHeader>
           <div className='border-2 border-dashed rounded-lg p-8 text-center'>
             <input type='file' accept='.csv' onChange={(e) => setCsvFile(e.target.files?.[0] || null)} className='hidden' id='csv-upload' />
             <label htmlFor='csv-upload' className='cursor-pointer'>
               {csvFile ? (
                 <div className='flex items-center justify-center gap-2 text-emerald-500'>
-                  <span className='text-2xl'>📎</span>
-                  <span className='font-medium'>{csvFile.name}</span>
+                  <Upload size={20} /> <span className='font-medium'>{csvFile.name}</span>
                   <span className='text-xs text-muted-foreground'>({(csvFile.size / 1024).toFixed(1)} KB)</span>
                 </div>
               ) : (
                 <div className='text-muted-foreground'>
-                  <span className='text-3xl block mb-2'>📁</span>
-                  <span className='text-sm'>Click to choose a CSV file</span>
+                  <Upload size={32} className='mx-auto mb-2 opacity-50' />
+                  <span className='text-sm'>{t('dash.csv.choose')}</span>
                 </div>
               )}
             </label>
           </div>
           <DialogFooter>
             <Button variant='outline' onClick={() => setCsvOpen(false)}>
-              Cancel
+              {t('dash.btn.cancel')}
             </Button>
             <Button onClick={handleCsvImport} disabled={!csvFile || csvLoading} className='bg-linear-to-r from-emerald-600 to-teal-600 text-white'>
-              {csvLoading ? 'Importing...' : 'Import'}
+              {csvLoading ? t('dash.csv.importing') : t('dash.csv.import')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══════ Manual Create Dialog ═══════ */}
+      {/* ═══ Create Dialog ═══ */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className='max-w-2xl'>
           <DialogHeader>
-            <DialogTitle>➕ Create Order</DialogTitle>
-            <DialogDescription>Add a new order with address picker</DialogDescription>
+            <DialogTitle className='flex items-center gap-2'>
+              <PlusCircle size={18} /> {t('dash.create.title')}
+            </DialogTitle>
+            <DialogDescription>{t('dash.create.desc')}</DialogDescription>
           </DialogHeader>
           <div className='space-y-4'>
-            <div className='grid grid-cols-2 gap-4'>
-              <div className='space-y-2'>
-                <Label>Email</Label>
-                <Input
-                  placeholder='customer@email.com'
-                  value={createForm.email}
-                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                />
-              </div>
-              <div className='space-y-2'>
-                <Label>Kit Type</Label>
-                <div className='flex gap-1.5'>
-                  {(['KIT_SILVER', 'KIT_GOLD', 'KIT_PLATINUM'] as const).map((kit) => (
+            <div className='space-y-2'>
+              <Label>{t('dash.orders.email')}</Label>
+              <Input
+                placeholder='customer@email.com'
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label>{t('dash.orders.kit')}</Label>
+              <div className='grid grid-cols-4 gap-2'>
+                {ALL_KIT_TYPES.map((kit) => {
+                  const info = KIT_INFO[kit]
+                  const img = TIER_IMAGES[info.tier]
+                  const selected = createForm.kitType === kit
+                  return (
                     <button
                       key={kit}
                       type='button'
                       onClick={() => setCreateForm({ ...createForm, kitType: kit })}
-                      className={`flex-1 p-2 rounded-lg border text-xs font-medium transition-all ${createForm.kitType === kit ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500' : 'border-border text-muted-foreground'}`}
+                      className={`relative flex flex-col items-center gap-1 rounded-xl border-2 overflow-hidden transition-all duration-200 ${selected ? 'border-emerald-500 shadow-lg shadow-emerald-500/10 scale-[1.02]' : 'border-border opacity-70 hover:opacity-100'}`}
                     >
-                      {kit === 'KIT_SILVER' ? '🥈' : kit === 'KIT_GOLD' ? '🥇' : '💎'} {kit.replace('KIT_', '')}
+                      {img ? (
+                        <img src={img} alt={info.label} className='w-full h-16 object-cover' />
+                      ) : (
+                        <div className='w-full h-16 bg-muted flex items-center justify-center'>
+                          <Package size={20} className='text-muted-foreground' />
+                        </div>
+                      )}
+                      <div className='p-1.5 text-center w-full'>
+                        <span className={`text-xs font-semibold block ${selected ? 'text-emerald-500' : ''}`}>{info.label}</span>
+                        <span className='text-[10px] text-muted-foreground'>${info.price}</span>
+                      </div>
+                      {info.plus && (
+                        <div className='absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center'>
+                          <Plus size={10} className='text-white' strokeWidth={3} />
+                        </div>
+                      )}
+                      {selected && (
+                        <div className='absolute top-1 left-1 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center'>
+                          <svg className='w-2.5 h-2.5 text-white' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={3}>
+                            <path strokeLinecap='round' strokeLinejoin='round' d='M5 13l4 4L19 7' />
+                          </svg>
+                        </div>
+                      )}
                     </button>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             </div>
             <LocationPicker
@@ -668,92 +793,74 @@ export default function Dashboard() {
           </div>
           <DialogFooter>
             <Button variant='outline' onClick={() => setCreateOpen(false)}>
-              Cancel
+              {t('dash.btn.cancel')}
             </Button>
             <Button
               onClick={handleCreate}
               disabled={createLoading || !createForm.email || !createForm.latitude}
               className='bg-linear-to-r from-emerald-600 to-teal-600 text-white'
             >
-              {createLoading ? 'Creating...' : 'Create Order'}
+              {createLoading ? t('dash.create.loading') : t('dash.create.btn')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══════ Edit Dialog ═══════ */}
+      {/* ═══ Edit Dialog ═══ */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className='max-w-2xl'>
           <DialogHeader>
-            <DialogTitle>✏️ Edit Order</DialogTitle>
-            <DialogDescription className='font-mono text-xs'>{editOrder?.id}</DialogDescription>
+            <DialogTitle className='flex items-center gap-2'>
+              <Pencil size={18} /> {t('dash.edit.title')}
+            </DialogTitle>
+            <DialogDescription className='font-mono text-xs'>ID: {editOrder?.id}</DialogDescription>
           </DialogHeader>
           {editOrder && (
             <div className='space-y-4'>
               <div className='grid grid-cols-2 gap-4'>
                 <div className='space-y-2'>
-                  <Label>Email</Label>
-                  <Input value={editOrder.receiverEmail} onChange={(e) => setEditOrder({ ...editOrder, receiverEmail: e.target.value })} />
+                  <Label>{t('dash.orders.email')}</Label>
+                  <Input value={editOrder.receiverEmail ?? ''} onChange={(e) => setEditOrder({ ...editOrder, receiverEmail: e.target.value })} />
                 </div>
                 <div className='space-y-2'>
-                  <Label>Kit Type</Label>
+                  <Label>{t('dash.orders.kit')}</Label>
                   <select
                     value={editOrder.kitType}
-                    onChange={(e) => setEditOrder({ ...editOrder, kitType: e.target.value as any })}
+                    onChange={(e) => setEditOrder({ ...editOrder, kitType: e.target.value as KitType })}
                     className='w-full h-9 px-3 rounded-md border bg-background text-sm'
                   >
-                    <option value='KIT_SILVER'>🥈 Silver</option>
-                    <option value='KIT_GOLD'>🥇 Gold</option>
-                    <option value='KIT_PLATINUM'>💎 Platinum</option>
+                    {ALL_KIT_TYPES.map((k) => (
+                      <option key={k} value={k}>
+                        {KIT_INFO[k].label} (${KIT_INFO[k].price})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
-              <div className='grid grid-cols-3 gap-3'>
+              <div className='grid grid-cols-2 gap-4'>
                 <div className='space-y-2'>
-                  <Label>Order Status</Label>
+                  <Label>{t('dash.orders.status')}</Label>
                   <select
                     value={editOrder.orderStatus}
-                    onChange={(e) => setEditOrder({ ...editOrder, orderStatus: e.target.value as any })}
+                    onChange={(e) => setEditOrder({ ...editOrder, orderStatus: e.target.value })}
                     className='w-full h-9 px-3 rounded-md border bg-background text-sm'
                   >
-                    <option value='ORDERED'>Ordered</option>
-                    <option value='ON_THE_WAY'>On the way</option>
-                    <option value='RETURNING'>Returning</option>
-                    <option value='DELIVERED'>Delivered</option>
-                    <option value='RECEIVED'>Received</option>
-                    <option value='WAITING_FOR_PAYMENT'>Waiting payment</option>
+                    <option value='ORDERED'>{t('dash.status.ordered')}</option>
+                    <option value='ON_THE_WAY'>{t('dash.status.on_the_way')}</option>
+                    <option value='RETURNING'>{t('dash.status.returning')}</option>
+                    <option value='DELIVERED'>{t('dash.status.delivered')}</option>
+                    <option value='RECEIVED'>{t('dash.status.received')}</option>
+                    <option value='WAITING_FOR_PAYMENT'>{t('dash.status.waiting')}</option>
                   </select>
                 </div>
                 <div className='space-y-2'>
-                  <Label>Payment</Label>
-                  <select
-                    value={editOrder.paymentStatus}
-                    onChange={(e) => setEditOrder({ ...editOrder, paymentStatus: e.target.value as any })}
-                    className='w-full h-9 px-3 rounded-md border bg-background text-sm'
-                  >
-                    <option value='NOT_PAID'>Not Paid</option>
-                    <option value='PAID'>Paid</option>
-                  </select>
-                </div>
-                <div className='space-y-2'>
-                  <Label>Subtotal</Label>
+                  <Label>{t('dash.orders.subtotal')}</Label>
                   <Input
                     type='number'
                     value={editOrder.subtotal}
                     onChange={(e) => setEditOrder({ ...editOrder, subtotal: parseInt(e.target.value) || 0 })}
                   />
                 </div>
-              </div>
-              <div className='space-y-2'>
-                <Label>Delivery Progress: {editOrder.deliveryProgress}%</Label>
-                <input
-                  type='range'
-                  min='0'
-                  max='100'
-                  value={editOrder.deliveryProgress}
-                  onChange={(e) => setEditOrder({ ...editOrder, deliveryProgress: parseInt(e.target.value) })}
-                  className='w-full accent-emerald-500'
-                />
               </div>
               <LocationPicker
                 compact
@@ -765,20 +872,22 @@ export default function Dashboard() {
           )}
           <DialogFooter>
             <Button variant='outline' onClick={() => setEditOpen(false)}>
-              Cancel
+              {t('dash.btn.cancel')}
             </Button>
             <Button onClick={handleEditSave} className='bg-linear-to-r from-emerald-600 to-teal-600 text-white'>
-              Save Changes
+              {t('dash.btn.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══════ Map Dialog ═══════ */}
+      {/* ═══ Map Dialog ═══ */}
       <Dialog open={mapOpen} onOpenChange={setMapOpen}>
         <DialogContent className='max-w-2xl'>
           <DialogHeader>
-            <DialogTitle>🗺️ Order Location</DialogTitle>
+            <DialogTitle className='flex items-center gap-2'>
+              <Map size={18} /> {t('dash.map.title')}
+            </DialogTitle>
             <DialogDescription className='font-mono text-xs'>
               {mapOrder?.latitude.toFixed(6)}, {mapOrder?.longitude.toFixed(6)}
             </DialogDescription>
@@ -793,7 +902,7 @@ export default function Dashboard() {
           )}
           <DialogFooter>
             <Button variant='outline' onClick={() => setMapOpen(false)}>
-              Close
+              {t('dash.btn.close')}
             </Button>
           </DialogFooter>
         </DialogContent>

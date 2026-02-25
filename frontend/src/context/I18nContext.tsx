@@ -28,15 +28,9 @@ const translations = {
     'dash.admin': 'Адмін',
     'dash.stats.orders': 'Всього замовлень',
     'dash.stats.tax': 'Зібрано податків',
-    'dash.stats.pending': 'На перевірці',
-    'dash.import.title': '📄 Імпорт CSV',
-    'dash.import.desc': 'Завантажте CSV файл із замовленнями для масового розрахунку податків',
-    'dash.manual.title': '➕ Нове замовлення',
-    'dash.manual.desc': 'Створіть замовлення вручну з координатами та сумою',
-    'dash.orders.title': 'Замовлення',
-    'dash.orders.empty': 'Замовлень не знайдено',
-    'dash.orders.loading': 'Завантажуємо замовлення...',
-    'dash.orders.error': 'Помилка завантаження',
+    'dash.stats.pending': 'Очікує оплати',
+
+    // Dashboard — orders table
     'dash.orders.id': 'ID',
     'dash.orders.email': 'Email',
     'dash.orders.kit': 'Набір',
@@ -44,11 +38,67 @@ const translations = {
     'dash.orders.payment': 'Оплата',
     'dash.orders.coords': 'Координати',
     'dash.orders.date': 'Дата',
+    'dash.orders.subtotal': 'Сума',
     'dash.orders.progress': 'Прогрес',
     'dash.orders.actions': 'Дії',
-    'dash.orders.delete.confirm': 'Ви впевнені що хочете видалити це замовлення?',
+    'dash.orders.empty': 'Замовлень не знайдено',
+    'dash.orders.loading': 'Завантажуємо замовлення...',
+    'dash.orders.error': 'Помилка завантаження',
     'dash.orders.deleted': 'Замовлення видалено',
-    'dash.orders.paid': 'Позначено як оплачено',
+    'dash.orders.paid': 'Оплачено',
+    'dash.orders.unpaid': 'Позначено як неоплачено (локально)',
+    'dash.orders.not_paid': 'Не оплачено',
+
+    // Dashboard — statuses
+    'dash.status.ordered': 'Замовлено',
+    'dash.status.on_the_way': 'В дорозі',
+    'dash.status.returning': 'Повертається',
+    'dash.status.delivered': 'Доставлено',
+    'dash.status.received': 'Отримано',
+    'dash.status.waiting': 'Очікує оплати',
+
+    // Dashboard — filters
+    'dash.filter.all': 'Всі',
+    'dash.filter.search': 'Пошук...',
+    'dash.filter.clear': 'Скинути',
+
+    // Dashboard — pagination
+    'dash.page.prev': 'Назад',
+    'dash.page.next': 'Далі',
+    'dash.page.label': 'Сторінка',
+    'dash.page.size': 'На сторінці',
+    'dash.page.showing': 'показано',
+
+    // Dashboard — buttons
+    'dash.btn.cancel': 'Скасувати',
+    'dash.btn.delete': 'Видалити',
+    'dash.btn.save': 'Зберегти',
+    'dash.btn.close': 'Закрити',
+
+    // Dashboard — create
+    'dash.create.btn': 'Нове замовлення',
+    'dash.create.title': 'Нове замовлення',
+    'dash.create.desc': 'Створіть замовлення вручну',
+    'dash.create.loading': 'Створюємо...',
+
+    // Dashboard — edit
+    'dash.edit.title': 'Редагувати замовлення',
+    'dash.edit.saved': 'Збережено',
+
+    // Dashboard — delete
+    'dash.delete.title': 'Видалити замовлення',
+    'dash.delete.desc': 'Ви впевнені? Цю дію неможливо відмінити.',
+
+    // Dashboard — map
+    'dash.map.title': 'Карта',
+
+    // Dashboard — CSV
+    'dash.csv.title': 'Імпорт CSV',
+    'dash.csv.desc': 'Завантажте CSV файл із замовленнями',
+    'dash.csv.choose': 'Натисніть щоб обрати файл',
+    'dash.csv.import': 'Імпортувати',
+    'dash.csv.importing': 'Імпортуємо...',
+    'dash.csv.success': 'CSV імпортовано!',
 
     // Public
     'pub.hero.title': 'Wellness доставка дроном',
@@ -67,10 +117,16 @@ const translations = {
     'order.submit': 'Замовити',
     'order.submit.loading': 'Оформлюємо...',
     'order.success': 'Замовлення створено!',
+    'order.location.required': 'Оберіть місце доставки',
 
-    'order.kit.KIT_SILVER': 'Silver',
-    'order.kit.KIT_GOLD': 'Gold',
-    'order.kit.KIT_PLATINUM': 'Platinum',
+    'order.kit.DEFAULT': 'Стандарт',
+    'order.kit.DEFAULT_PLUS': 'Стандарт+',
+    'order.kit.SILVER': 'Срібний',
+    'order.kit.SILVER_PLUS': 'Срібний+',
+    'order.kit.GOLD': 'Золотий',
+    'order.kit.GOLD_PLUS': 'Золотий+',
+    'order.kit.PLATINUM': 'Платиновий',
+    'order.kit.PLATINUM_PLUS': 'Платиновий+',
 
     // Track page
     'track.title': 'Відстежити замовлення',
@@ -86,7 +142,6 @@ const translations = {
     'track.placed': 'Дата замовлення',
     'track.delivered': 'Дата доставки',
 
-    // Common
     loading: 'Завантаження...',
   },
   en: {
@@ -114,15 +169,8 @@ const translations = {
     'dash.admin': 'Admin',
     'dash.stats.orders': 'Total Orders',
     'dash.stats.tax': 'Tax Collected',
-    'dash.stats.pending': 'Pending Review',
-    'dash.import.title': '📄 Import CSV',
-    'dash.import.desc': 'Upload a CSV file with orders to calculate taxes in bulk',
-    'dash.manual.title': '➕ Manual Order',
-    'dash.manual.desc': 'Create an order manually with coordinates and subtotal',
-    'dash.orders.title': 'Orders',
-    'dash.orders.empty': 'No orders found',
-    'dash.orders.loading': 'Loading orders...',
-    'dash.orders.error': 'Failed to load orders',
+    'dash.stats.pending': 'Awaiting Payment',
+
     'dash.orders.id': 'ID',
     'dash.orders.email': 'Email',
     'dash.orders.kit': 'Kit',
@@ -130,11 +178,58 @@ const translations = {
     'dash.orders.payment': 'Payment',
     'dash.orders.coords': 'Coordinates',
     'dash.orders.date': 'Date',
+    'dash.orders.subtotal': 'Subtotal',
     'dash.orders.progress': 'Progress',
     'dash.orders.actions': 'Actions',
-    'dash.orders.delete.confirm': 'Are you sure you want to delete this order?',
+    'dash.orders.empty': 'No orders found',
+    'dash.orders.loading': 'Loading orders...',
+    'dash.orders.error': 'Failed to load orders',
     'dash.orders.deleted': 'Order deleted',
-    'dash.orders.paid': 'Marked as paid',
+    'dash.orders.paid': 'Paid',
+    'dash.orders.unpaid': 'Marked as unpaid (local)',
+    'dash.orders.not_paid': 'Not paid',
+
+    'dash.status.ordered': 'Ordered',
+    'dash.status.on_the_way': 'On the Way',
+    'dash.status.returning': 'Returning',
+    'dash.status.delivered': 'Delivered',
+    'dash.status.received': 'Received',
+    'dash.status.waiting': 'Awaiting Payment',
+
+    'dash.filter.all': 'All',
+    'dash.filter.search': 'Search...',
+    'dash.filter.clear': 'Clear',
+
+    'dash.page.prev': 'Prev',
+    'dash.page.next': 'Next',
+    'dash.page.label': 'Page',
+    'dash.page.size': 'Per page',
+    'dash.page.showing': 'shown',
+
+    'dash.btn.cancel': 'Cancel',
+    'dash.btn.delete': 'Delete',
+    'dash.btn.save': 'Save',
+    'dash.btn.close': 'Close',
+
+    'dash.create.btn': 'New Order',
+    'dash.create.title': 'New Order',
+    'dash.create.desc': 'Create an order manually',
+    'dash.create.loading': 'Creating...',
+
+    'dash.edit.title': 'Edit Order',
+    'dash.edit.saved': 'Saved',
+
+    'dash.delete.title': 'Delete Order',
+    'dash.delete.desc': 'Are you sure? This action cannot be undone.',
+
+    'dash.map.title': 'Map',
+
+    'dash.csv.title': 'Import CSV',
+    'dash.csv.desc': 'Upload a CSV file with orders',
+    'dash.csv.choose': 'Click to choose a file',
+    'dash.csv.import': 'Import',
+    'dash.csv.importing': 'Importing...',
+    'dash.csv.success': 'CSV imported!',
 
     'pub.hero.title': 'Drone Wellness Delivery',
     'pub.hero.subtitle': 'Instant wellness kits delivered anywhere in New York State in 20-30 minutes',
@@ -151,10 +246,16 @@ const translations = {
     'order.submit': 'Place Order',
     'order.submit.loading': 'Placing order...',
     'order.success': 'Order placed successfully!',
+    'order.location.required': 'Please pick a delivery location',
 
-    'order.kit.KIT_SILVER': 'Silver',
-    'order.kit.KIT_GOLD': 'Gold',
-    'order.kit.KIT_PLATINUM': 'Platinum',
+    'order.kit.DEFAULT': 'Default',
+    'order.kit.DEFAULT_PLUS': 'Default+',
+    'order.kit.SILVER': 'Silver',
+    'order.kit.SILVER_PLUS': 'Silver+',
+    'order.kit.GOLD': 'Gold',
+    'order.kit.GOLD_PLUS': 'Gold+',
+    'order.kit.PLATINUM': 'Platinum',
+    'order.kit.PLATINUM_PLUS': 'Platinum+',
 
     'track.title': 'Track Your Order',
     'track.subtitle': 'Enter your order ID to see the status',
