@@ -23,7 +23,6 @@
 
 ![Де знайти Anon Key](./supabase_anonkey.png)
 
-
 ## Бекенд
 
 ```bash
@@ -47,16 +46,6 @@ docker compose up -d
 
 Бек буде на `http://localhost:8080`.
 
-### Ендпоїнти
-
-| Метод  | URL          | Що робить                                        |
-| ------ | ------------ | ------------------------------------------------ |
-| GET    | /orders      | Список замовлень                                 |
-| GET    | /orders/{id} | Одне замовлення                                  |
-| POST   | /orders      | Створити `{email, latitude, longitude, kitType}` |
-| PATCH  | /orders/{id} | Позначити оплаченим                              |
-| DELETE | /orders/{id} | Видалити                                         |
-
 ## Фронтенд
 
 ```bash
@@ -73,7 +62,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...ваш_ключ
 VITE_API_URL=http://localhost:8080
 ```
 
-> `VITE_API_URL` — адреса Spring бекенду, **не** Vite. Vite працює на 5173, бек на 8080.
+> `VITE_API_URL` — адреса Spring бекенду
 
 ```bash
 npm run dev
@@ -111,5 +100,5 @@ frontend/src/
 
 - Авторизація через Supabase Auth. Бек може перевіряти JWT токени Supabase.
 - Геокодинг через Nominatim (OpenStreetMap) — безкоштовно, без API ключа.
-- Типи наборів: Silver, Gold, Platinum.
+- Типи наборів: Default, Default+, Silver, Silver+, Gold, Gold+, Platinum, Platinum+.
 - Адмінка на `/admin`, клієнтська частина на `/`.
