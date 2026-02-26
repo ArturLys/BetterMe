@@ -387,7 +387,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-8'>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-8'>
           <Card>
             <CardHeader className='pb-2'>
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.orders')}</CardTitle>
@@ -406,14 +406,14 @@ export default function Dashboard() {
               </p>
             </CardContent>
           </Card>
-          <Card>
+          {/* <Card>
             <CardHeader className='pb-2'>
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.pending')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className='text-3xl font-bold'>{statsData ? statsData.totalPending.toLocaleString() : '—'}</p>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
 
         <Separator className='mb-6' />
