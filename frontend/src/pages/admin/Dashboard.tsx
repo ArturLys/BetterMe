@@ -70,7 +70,7 @@ const STATUS_COLORS: Record<string, string> = {
   WAITING_FOR_PAYMENT: 'bg-red-500/10 text-red-500 border-red-500/20',
 }
 
-type SortField = 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'subtotal'
+type SortField = 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'subtotal' | 'taxAmount' | 'totalAmount'
 type SortDir = 'asc' | 'desc'
 
 const PAGE_SIZES = [10, 20, 50, 100] as const
@@ -136,6 +136,11 @@ export default function Dashboard() {
   const pagesNeeded = Math.ceil(pageSize / BACKEND_PAGE_SIZE)
 
   const queryKey = ['orders', page, pageSize, filterStatus, filterEmail, filterKit]
+
+  const { data: statsData } = useQuery({
+    queryKey: ['stats'],
+    queryFn: api.orders.getStats,
+  })
 
   const {
     data: queryData,
@@ -218,19 +223,19 @@ export default function Dashboard() {
     setDeleteTarget(null)
   }
 
-  const handleTogglePaid = async (order: Order) => {
-    try {
-      if ((order.paymentStatus ?? 'NOT_PAID') === 'NOT_PAID') {
-        await api.orders.setPaid(order.id)
-        toast(t('dash.orders.paid'), 'success')
-        qc.invalidateQueries({ queryKey: ['orders'] })
-      } else {
-        toast(t('dash.orders.unpaid'), 'info')
-      }
-    } catch (err: any) {
-      toast(err.message, 'error')
-    }
-  }
+  // const handleTogglePaid = async (order: Order) => {
+  //   try {
+  //     if ((order.paymentStatus ?? 'NOT_PAID') === 'NOT_PAID') {
+  //       await api.orders.setPaid(order.id)
+  //       toast(t('dash.orders.paid'), 'success')
+  //       qc.invalidateQueries({ queryKey: ['orders'] })
+  //     } else {
+  //       toast(t('dash.orders.unpaid'), 'info')
+  //     }
+  //   } catch (err: any) {
+  //     toast(err.message, 'error')
+  //   }
+  // }
 
   const handleCreate = async () => {
     setCreateLoading(true)
@@ -386,7 +391,7 @@ export default function Dashboard() {
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.orders')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-3xl font-bold'>{totalElements >= 0 ? totalElements.toLocaleString() : orders.length}</p>
+              <p className='text-3xl font-bold'>{statsData ? statsData.totalOrders.toLocaleString() : '—'}</p>
             </CardContent>
           </Card>
           <Card>
@@ -394,7 +399,9 @@ export default function Dashboard() {
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.tax')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-3xl font-bold'>—</p>
+              <p className='text-3xl font-bold'>
+                {statsData ? `$${statsData.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -402,7 +409,7 @@ export default function Dashboard() {
               <CardTitle className='text-sm font-medium text-muted-foreground'>{t('dash.stats.pending')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className='text-3xl font-bold'>{orders.filter((o) => (o.paymentStatus ?? 'NOT_PAID') === 'NOT_PAID').length}</p>
+              <p className='text-3xl font-bold'>{statsData ? statsData.totalPending.toLocaleString() : '—'}</p>
             </CardContent>
           </Card>
         </div>
@@ -543,12 +550,26 @@ export default function Dashboard() {
                       </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
+                        onClick={() => toggleSort('taxAmount')}
+                      >
+                        Tax
+                        <SortIcon field='taxAmount' />
+                      </th>
+                      <th
+                        className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
+                        onClick={() => toggleSort('totalAmount')}
+                      >
+                        Total
+                        <SortIcon field='totalAmount' />
+                      </th>
+                      <th
+                        className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('timestamp')}
                       >
                         {t('dash.orders.date')}
                         <SortIcon field='timestamp' />
                       </th>
-                      <th className='text-left px-3 py-3 font-medium text-muted-foreground'>{t('dash.orders.payment')}</th>
+                      {/* <th className='text-left px-3 py-3 font-medium text-muted-foreground'>{t('dash.orders.payment')}</th> */}
                       <th className='text-left px-3 py-3 font-medium text-muted-foreground'>{t('dash.orders.actions')}</th>
                     </tr>
                   </thead>
@@ -569,8 +590,15 @@ export default function Dashboard() {
                           </Badge>
                         </td>
                         <td className='px-3 py-3 text-xs font-mono'>${order.subtotal}</td>
+                        <td className='px-3 py-3 text-xs font-mono text-muted-foreground'>
+                          {order.taxAmount !== undefined ? `$${order.taxAmount.toFixed(2)}` : '—'}
+                          {order.compositeTax ? ` (${(order.compositeTax * 100).toFixed(1)}%)` : ''}
+                        </td>
+                        <td className='px-3 py-3 text-xs font-mono font-medium'>
+                          {order.totalAmount !== undefined ? `$${order.totalAmount.toFixed(2)}` : '—'}
+                        </td>
                         <td className='px-3 py-3 text-xs text-muted-foreground'>{order.timestamp?.slice(0, 10) ?? '—'}</td>
-                        <td className='px-3 py-3'>
+                        {/* <td className='px-3 py-3'>
                           <Badge
                             variant='outline'
                             className={`text-xs cursor-pointer transition-colors ${
@@ -582,7 +610,7 @@ export default function Dashboard() {
                           >
                             {(order.paymentStatus ?? 'NOT_PAID') === 'PAID' ? t('dash.orders.paid') : t('dash.orders.not_paid')}
                           </Badge>
-                        </td>
+                        </td> */}
                         <td className='px-3 py-3'>
                           <div className='flex items-center gap-0.5'>
                             <Button variant='ghost' size='sm' className='h-7 w-7 p-0' title={t('dash.edit.title')} onClick={() => openEdit(order)}>

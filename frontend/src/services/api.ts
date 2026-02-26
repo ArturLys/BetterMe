@@ -22,6 +22,9 @@ export interface Order {
   longitude: number
   distance?: number
   subtotal: number
+  taxAmount?: number
+  compositeTax?: number
+  totalAmount?: number
   timestamp: string
   deliveredAt?: string | null
   kitType: KitType
@@ -37,11 +40,16 @@ export interface OrderCreateDTO {
   kitType: string
 }
 
-/** Result from paginated list endpoint */
 export interface PagedOrders {
   items: Order[]
   totalElements: number
   totalPages: number
+}
+
+export interface OrderStats {
+  totalOrders: number
+  totalTax: number
+  totalPending: number
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -79,6 +87,7 @@ export const api = {
       return { items: [], totalElements: 0, totalPages: 0 }
     },
 
+    getStats: () => request<OrderStats>('/orders/stats'),
     getById: (id: number) => request<Order>(`/orders/${id}`),
     create: (dto: OrderCreateDTO) => request<void>('/orders', { method: 'POST', body: JSON.stringify(dto) }),
     setPaid: (id: number) => request<void>(`/orders/${id}`, { method: 'PATCH' }),
