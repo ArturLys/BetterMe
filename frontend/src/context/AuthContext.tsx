@@ -1,13 +1,19 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { supabase } from '../client'
-import type { User, Session } from '@supabase/supabase-js'
+
+export interface User {
+  login: string
+}
+
+export interface Session {
+  token: string
+}
 
 interface AuthState {
   user: User | null
   session: Session | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string) => Promise<{ error: any }>
+  signIn: (login: string, password: string) => Promise<{ error: any }>
+  signUp: (login: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
 }
 
@@ -19,34 +25,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-    })
-
-    return () => subscription.unsubscribe()
+    const savedUser = localStorage.getItem('user')
+    const savedToken = localStorage.getItem('token') || 'mock-token'
+    if (savedUser) {
+      setUser(JSON.parse(savedUser))
+      setSession({ token: savedToken })
+    }
+    setLoading(false)
   }, [])
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error }
+  const signIn = async (login: string, password: string) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '/api'
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: login, password }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Invalid credentials')
+      }
+
+      const text = await res.text()
+      let token = 'mock-token'
+      try {
+        const json = JSON.parse(text)
+        if (json.token) token = json.token
+        else if (json.jwt) token = json.jwt
+        else if (json.accessToken) token = json.accessToken
+      } catch (e) {
+        if (text && text.trim().length > 0) token = text.trim()
+      }
+
+      const userObj = { login }
+      setUser(userObj)
+      setSession({ token })
+      localStorage.setItem('user', JSON.stringify(userObj))
+      localStorage.setItem('token', token)
+
+      return { error: null }
+    } catch (error: any) {
+      return { error: { message: error.message } }
+    }
   }
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password })
-    return { error }
+  const signUp = async (_login: string, _password: string) => {
+    // Hide register for now as requested
+    return { error: { message: 'Registration is disabled for now.' } }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    setUser(null)
+    setSession(null)
+    localStorage.removeItem('user')
+    localStorage.removeItem('token')
   }
 
   return <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>{children}</AuthContext.Provider>

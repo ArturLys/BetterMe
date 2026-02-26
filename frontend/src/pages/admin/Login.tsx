@@ -7,12 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('')
+  const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
+  const isSignUp = false
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { signIn, signUp } = useAuth()
@@ -25,7 +24,7 @@ export default function AdminLogin() {
     setError(null)
     setLoading(true)
 
-    const { error } = isSignUp ? await signUp(email, password) : await signIn(email, password)
+    const { error } = isSignUp ? await signUp(login, password) : await signIn(login, password)
 
     if (error) {
       setError(error.message)
@@ -76,13 +75,13 @@ export default function AdminLogin() {
           <CardContent>
             <form onSubmit={handleSubmit} className='space-y-4'>
               <div className='space-y-2'>
-                <Label htmlFor='email'>{t('login.email')}</Label>
+                <Label htmlFor='login'>Login</Label>
                 <Input
-                  id='email'
-                  type='email'
-                  placeholder='admin@betterme.com'
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id='login'
+                  type='text'
+                  placeholder='admin'
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
                   required
                   className='h-11'
                 />
@@ -121,6 +120,7 @@ export default function AdminLogin() {
               </Button>
             </form>
 
+            {/* Registration is hidden for now
             <Separator className='my-6' />
 
             <p className='text-center text-sm text-muted-foreground'>
@@ -136,6 +136,7 @@ export default function AdminLogin() {
                 {isSignUp ? t('login.toggle.signin.link') : t('login.toggle.signup.link')}
               </button>
             </p>
+            */}
           </CardContent>
         </Card>
 
