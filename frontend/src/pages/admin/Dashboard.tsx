@@ -435,7 +435,7 @@ export default function Dashboard() {
               <option value='ON_THE_WAY'>{t('dash.status.on_the_way')}</option>
               <option value='DELIVERED'>{t('dash.status.delivered')}</option>
               <option value='RECEIVED'>{t('dash.status.received')}</option>
-              <option value='WAITING_FOR_PAYMENT'>{t('dash.status.waiting')}</option>
+              <option value='WAITING_FOR_PAYMENT'>{t('dash.status.waiting_for_payment')}</option>
             </select>
           </div>
           <div className='space-y-1'>
@@ -955,7 +955,7 @@ export default function Dashboard() {
                     <option value='RETURNING'>{t('dash.status.returning')}</option>
                     <option value='DELIVERED'>{t('dash.status.delivered')}</option>
                     <option value='RECEIVED'>{t('dash.status.received')}</option>
-                    <option value='WAITING_FOR_PAYMENT'>{t('dash.status.waiting')}</option>
+                    <option value='WAITING_FOR_PAYMENT'>{t('dash.status.waiting_for_payment')}</option>
                   </select>
                 </div>
                 <div className='space-y-2'>

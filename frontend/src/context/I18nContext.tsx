@@ -57,7 +57,7 @@ const translations = {
     'dash.status.returning': 'Повертається',
     'dash.status.delivered': 'Доставлено',
     'dash.status.received': 'Отримано',
-    'dash.status.waiting': 'Очікує оплати',
+    'dash.status.waiting_for_payment': 'Очікує оплати',
 
     // Dashboard — filters
     'dash.filter.all': 'Всі',
@@ -198,7 +198,7 @@ const translations = {
     'dash.status.returning': 'Returning',
     'dash.status.delivered': 'Delivered',
     'dash.status.received': 'Received',
-    'dash.status.waiting': 'Awaiting Payment',
+    'dash.status.waiting_for_payment': 'Awaiting Payment',
 
     'dash.filter.all': 'All',
     'dash.filter.search': 'Search...',
