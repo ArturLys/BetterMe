@@ -161,31 +161,52 @@ export default function Dashboard() {
       if (filterEmail) baseFilters.email = filterEmail
       if (filterKit) baseFilters.kitType = filterKit
 
-      const backendStartPage = page * pagesNeeded
-      // If the backend returns a Spring Page object with totalElements, exactTotalOrders is irrelevant for filtering, but useful for unfiltered.
-      // If we are applying filters and the backend gives us an array, we'll hit a roadblock without total counts anyway.
-      // We will prepare the target fetch assuming we don't know total elements:
-      const maxBackendPage = exactTotalOrders > 0 ? Math.max(0, Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE) - 1) : 0
+      let fetchedItems: Order[] = []
+      let totalFetchedElements = -1
+      let totalFetchedPages = -1
 
-      const fetches = Array.from({ length: pagesNeeded }, (_, i) => {
-        let targetPage = backendStartPage + i
-        // Use highest ID fetch
-        if (exactTotalOrders > 0 && !(filterStatus || filterEmail || filterKit)) {
-          targetPage = Math.max(0, maxBackendPage - targetPage)
+      const hasFilters = !!(filterStatus || filterEmail || filterKit)
+
+      if (exactTotalOrders > 0 && !hasFilters) {
+        // We want `pageSize` items ending at the very end of the database.
+        const endIndex = exactTotalOrders - page * pageSize
+        const startIndex = Math.max(0, endIndex - pageSize)
+
+        if (startIndex < endIndex) {
+          const startPage = Math.floor(startIndex / BACKEND_PAGE_SIZE)
+          const endPage = Math.floor((endIndex - 1) / BACKEND_PAGE_SIZE)
+
+          const fetches = []
+          for (let p = startPage; p <= endPage; p++) {
+            fetches.push(api.orders.list({ ...baseFilters, page: String(p), size: String(BACKEND_PAGE_SIZE) }))
+          }
+          const results = await Promise.all(fetches)
+          const merged = results.flatMap((r) => r.items)
+
+          // Slice the exact items we need (compensating for the fact that the first loaded page might contain items from before startIndex)
+          const localStartIndex = startIndex - startPage * BACKEND_PAGE_SIZE
+          const localEndIndex = endIndex - startPage * BACKEND_PAGE_SIZE
+          fetchedItems = merged.slice(localStartIndex, localEndIndex)
         }
-        return api.orders.list({ ...baseFilters, page: String(targetPage), size: String(BACKEND_PAGE_SIZE) })
-      })
-      const results = await Promise.all(fetches)
+        totalFetchedElements = exactTotalOrders
+        totalFetchedPages = Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE)
+      } else {
+        const backendStartPage = page * pagesNeeded
+        const fetches = Array.from({ length: pagesNeeded }, (_, i) => {
+          return api.orders.list({ ...baseFilters, page: String(backendStartPage + i), size: String(BACKEND_PAGE_SIZE) })
+        })
+        const results = await Promise.all(fetches)
+        fetchedItems = results.flatMap((r) => r.items)
+        if (results[0]) {
+          totalFetchedElements = results[0].totalElements ?? -1
+          totalFetchedPages = results[0].totalPages ?? -1
+        }
+      }
 
-      // Merge items from all sub-pages
-      const items = results.flatMap((r) => r.items)
-
-      // Use metadata from first result
-      const first = results[0]
       return {
-        items,
-        totalElements: first?.totalElements ?? -1,
-        totalPages: first?.totalPages ?? -1,
+        items: fetchedItems,
+        totalElements: totalFetchedElements,
+        totalPages: totalFetchedPages,
       }
     },
     placeholderData: (prev) => prev,
