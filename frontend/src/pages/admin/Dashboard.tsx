@@ -554,14 +554,14 @@ export default function Dashboard() {
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('taxAmount')}
                       >
-                        Tax
+                        {t('dash.orders.tax')}
                         <SortIcon field='taxAmount' />
                       </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('totalAmount')}
                       >
-                        Total
+                        {t('dash.orders.total')}
                         <SortIcon field='totalAmount' />
                       </th>
                       <th
@@ -666,6 +666,7 @@ export default function Dashboard() {
                 <PaginationPrevious
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   className={!hasPrevPage ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  label={t('dash.page.prev')}
                 />
               </PaginationItem>
 
@@ -727,6 +728,7 @@ export default function Dashboard() {
                 <PaginationNext
                   onClick={() => setPage((p) => p + 1)}
                   className={!hasNextPage ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  label={t('dash.page.next')}
                 />
               </PaginationItem>
               {/* Last page */}
