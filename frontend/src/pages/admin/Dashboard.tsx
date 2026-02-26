@@ -42,7 +42,6 @@ import {
   Moon,
   ChevronDown,
   X,
-  ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
