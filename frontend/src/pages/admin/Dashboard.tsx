@@ -161,23 +161,17 @@ export default function Dashboard() {
       if (filterEmail) baseFilters.email = filterEmail
       if (filterKit) baseFilters.kitType = filterKit
 
-      let activeTotalElements = exactTotalOrders
-      let activeMaxBackendPage = exactTotalOrders > 0 ? Math.max(0, Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE) - 1) : 0
-
-      const hasFilters = !!(filterStatus || filterEmail || filterKit)
-      if (hasFilters) {
-        const preflight = await api.orders.list({ ...baseFilters, page: '0', size: '1' })
-        activeTotalElements = preflight.totalElements > 0 ? preflight.totalElements : 0
-        activeMaxBackendPage = preflight.totalPages > 0 ? preflight.totalPages - 1 : 0
-      }
-
       const backendStartPage = page * pagesNeeded
+      // If the backend returns a Spring Page object with totalElements, exactTotalOrders is irrelevant for filtering, but useful for unfiltered.
+      // If we are applying filters and the backend gives us an array, we'll hit a roadblock without total counts anyway.
+      // We will prepare the target fetch assuming we don't know total elements:
+      const maxBackendPage = exactTotalOrders > 0 ? Math.max(0, Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE) - 1) : 0
 
       const fetches = Array.from({ length: pagesNeeded }, (_, i) => {
         let targetPage = backendStartPage + i
-        // Fetch starting from the highest ID because the backend refuses to sort it server-side!
-        if (activeTotalElements > 0) {
-          targetPage = Math.max(0, activeMaxBackendPage - targetPage)
+        // Use highest ID fetch
+        if (exactTotalOrders > 0 && !(filterStatus || filterEmail || filterKit)) {
+          targetPage = Math.max(0, maxBackendPage - targetPage)
         }
         return api.orders.list({ ...baseFilters, page: String(targetPage), size: String(BACKEND_PAGE_SIZE) })
       })
@@ -186,18 +180,27 @@ export default function Dashboard() {
       // Merge items from all sub-pages
       const items = results.flatMap((r) => r.items)
 
+      // Use metadata from first result
+      const first = results[0]
       return {
         items,
-        totalElements: activeTotalElements,
-        totalPages: activeTotalElements > 0 ? Math.ceil(activeTotalElements / BACKEND_PAGE_SIZE) : 0,
+        totalElements: first?.totalElements ?? -1,
+        totalPages: first?.totalPages ?? -1,
       }
     },
     placeholderData: (prev) => prev,
   })
   const orders = queryData?.items ?? []
 
-  // Use exact math from the dynamic query data
-  const totalElements = queryData?.totalElements ?? 0
+  // Use exact math from totalOrders avoiding backend -1, but prioritize queryData if the backend gave it to us
+  const totalElements =
+    queryData?.totalElements && queryData.totalElements > 0
+      ? queryData.totalElements
+      : exactTotalOrders > 0
+        ? exactTotalOrders
+        : orders.length > pageSize
+          ? orders.length
+          : 0
   const totalPages = totalElements > 0 ? Math.ceil(totalElements / pageSize) : 1
   const lastPage = Math.max(0, totalPages - 1)
 
@@ -298,7 +301,6 @@ export default function Dashboard() {
         receiverEmail: editOrder.receiverEmail,
         kitType: editOrder.kitType,
         orderStatus: editOrder.orderStatus,
-        subtotal: editOrder.subtotal,
         latitude: editOrder.latitude,
         longitude: editOrder.longitude,
       })
@@ -929,11 +931,11 @@ export default function Dashboard() {
           </DialogHeader>
           {editOrder && (
             <div className='space-y-4'>
+              <div className='space-y-2'>
+                <Label>{t('dash.orders.email')}</Label>
+                <Input value={editOrder.receiverEmail ?? ''} onChange={(e) => setEditOrder({ ...editOrder, receiverEmail: e.target.value })} />
+              </div>
               <div className='grid grid-cols-2 gap-4'>
-                <div className='space-y-2'>
-                  <Label>{t('dash.orders.email')}</Label>
-                  <Input value={editOrder.receiverEmail ?? ''} onChange={(e) => setEditOrder({ ...editOrder, receiverEmail: e.target.value })} />
-                </div>
                 <div className='space-y-2'>
                   <Label>{t('dash.orders.kit')}</Label>
                   <select
@@ -948,8 +950,6 @@ export default function Dashboard() {
                     ))}
                   </select>
                 </div>
-              </div>
-              <div className='grid grid-cols-2 gap-4'>
                 <div className='space-y-2'>
                   <Label>{t('dash.orders.status')}</Label>
                   <select
@@ -964,14 +964,6 @@ export default function Dashboard() {
                     <option value='RECEIVED'>{t('dash.status.received')}</option>
                     <option value='WAITING_FOR_PAYMENT'>{t('dash.status.waiting_for_payment')}</option>
                   </select>
-                </div>
-                <div className='space-y-2'>
-                  <Label>{t('dash.orders.subtotal')}</Label>
-                  <Input
-                    type='number'
-                    value={editOrder.subtotal}
-                    onChange={(e) => setEditOrder({ ...editOrder, subtotal: parseInt(e.target.value) || 0 })}
-                  />
                 </div>
               </div>
               <LocationPicker
