@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useI18n } from '../context/I18nContext'
 import { useToast } from '../context/ToastContext'
 import { api, type Order, KIT_INFO, type KitType } from '../services/api'
@@ -24,13 +25,13 @@ export default function TrackPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [searchParams] = useSearchParams()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const fetchOrder = async (idToFetch: string) => {
     setLoading(true)
     setSearched(true)
     try {
-      const id = parseInt(orderId.trim(), 10)
+      const id = parseInt(idToFetch.trim(), 10)
       if (isNaN(id)) throw new Error('Invalid ID')
       const data = await api.orders.getById(id)
       setOrder(data)
@@ -40,6 +41,20 @@ export default function TrackPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    const id = searchParams.get('id')
+    if (id) {
+      setOrderId(id)
+      fetchOrder(id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await fetchOrder(orderId)
   }
 
   const progress = order?.deliveryProgress ?? 0

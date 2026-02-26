@@ -72,7 +72,7 @@ const STATUS_COLORS: Record<string, string> = {
   WAITING_FOR_PAYMENT: 'bg-red-500/10 text-red-500 border-red-500/20',
 }
 
-type SortField = 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'subtotal' | 'taxAmount' | 'totalAmount'
+type SortField = 'id' | 'timestamp' | 'receiverEmail' | 'kitType' | 'orderStatus' | 'subtotal' | 'taxAmount' | 'totalAmount'
 type SortDir = 'asc' | 'desc'
 
 const PAGE_SIZES = [10, 20, 50, 100] as const
@@ -102,7 +102,7 @@ export default function Dashboard() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(20)
 
-  const [sortField, setSortField] = useState<SortField>('timestamp')
+  const [sortField, setSortField] = useState<SortField>('id')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   const [filterStatus, setFilterStatus] = useState('')
@@ -144,6 +144,11 @@ export default function Dashboard() {
     queryFn: api.orders.getStats,
   })
 
+  // We explicitly keep totalOrders in local state as fallback for perfect math
+  if (statsData?.totalOrders) localStorage.setItem('cachedTotalOrders', String(statsData.totalOrders))
+  const cachedTotalOrders = parseInt(localStorage.getItem('cachedTotalOrders') || '0', 10)
+  const exactTotalOrders = statsData?.totalOrders || cachedTotalOrders
+
   const {
     data: queryData,
     isFetching: loading,
@@ -158,9 +163,16 @@ export default function Dashboard() {
       if (filterKit) baseFilters.kitType = filterKit
 
       const backendStartPage = page * pagesNeeded
-      const fetches = Array.from({ length: pagesNeeded }, (_, i) =>
-        api.orders.list({ ...baseFilters, page: String(backendStartPage + i), size: String(BACKEND_PAGE_SIZE) })
-      )
+      const maxBackendPage = exactTotalOrders > 0 ? Math.max(0, Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE) - 1) : 0
+
+      const fetches = Array.from({ length: pagesNeeded }, (_, i) => {
+        let targetPage = backendStartPage + i
+        // Fetch starting from the highest ID because the backend refuses to sort it server-side!
+        if (exactTotalOrders > 0) {
+          targetPage = Math.max(0, maxBackendPage - targetPage)
+        }
+        return api.orders.list({ ...baseFilters, page: String(targetPage), size: String(BACKEND_PAGE_SIZE) })
+      })
       const results = await Promise.all(fetches)
 
       // Merge items from all sub-pages
@@ -176,17 +188,20 @@ export default function Dashboard() {
     },
     placeholderData: (prev) => prev,
   })
-
   const orders = queryData?.items ?? []
-  const totalElements = queryData?.totalElements ?? -1
-  const backendTotalPages = queryData?.totalPages ?? -1
-  // Our "virtual" total pages (grouping backend pages into user page size)
-  const totalPages = backendTotalPages > 0 ? Math.ceil((backendTotalPages * BACKEND_PAGE_SIZE) / pageSize) : -1
-  const lastPage = totalPages > 0 ? totalPages - 1 : -1
+
+  // Use exact math from totalOrders avoiding backend -1
+  const totalElements = exactTotalOrders > 0 ? exactTotalOrders : orders.length > pageSize ? orders.length : 0
+  const totalPages = totalElements > 0 ? Math.ceil(totalElements / pageSize) : 1
+  const lastPage = Math.max(0, totalPages - 1)
+
   const error = queryError ? (queryError as Error).message : null
 
   // ─── Client-side sort (within current page) ───
   const sortedOrders = [...orders].sort((a, b) => {
+    if (sortField === 'id') {
+      return sortDir === 'asc' ? a.id - b.id : b.id - a.id
+    }
     const av = a[sortField] ?? ''
     const bv = b[sortField] ?? ''
     const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true })
@@ -521,7 +536,13 @@ export default function Dashboard() {
                 <table className='w-full text-sm'>
                   <thead>
                     <tr className='border-b bg-muted/30'>
-                      <th className='text-left px-3 py-3 font-medium text-muted-foreground'>ID</th>
+                      <th
+                        className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
+                        onClick={() => toggleSort('id')}
+                      >
+                        {t('dash.orders.id')}
+                        <SortIcon field='id' />
+                      </th>
                       <th
                         className='text-left px-3 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground'
                         onClick={() => toggleSort('receiverEmail')}

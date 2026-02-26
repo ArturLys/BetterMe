@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useI18n } from '../context/I18nContext'
 import { useToast } from '../context/ToastContext'
 import { api, ALL_KIT_TYPES, KIT_INFO, type KitType } from '../services/api'
@@ -19,6 +20,7 @@ const TIER_ICONS: Record<string, typeof Package> = { default: Package, silver: A
 export default function OrderPage() {
   const { t } = useI18n()
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     email: '',
@@ -35,14 +37,15 @@ export default function OrderPage() {
     }
     setLoading(true)
     try {
-      await api.orders.create({
+      const orderId = await api.orders.create({
         email: form.email,
         latitude: parseFloat(form.latitude),
         longitude: parseFloat(form.longitude),
         kitType: form.kitType,
       })
       toast(t('order.success'), 'success')
-      setForm({ email: '', latitude: '', longitude: '', kitType: 'SILVER' })
+      setForm({ email: '', latitude: '', longitude: '', kitType: 'SILVER' as KitType })
+      navigate(`/track?id=${orderId}`)
     } catch (err: any) {
       toast(err.message, 'error')
     } finally {
