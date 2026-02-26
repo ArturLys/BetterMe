@@ -1,3 +1,5 @@
+// God component, more like cute component :3
+
 import { useEffect, useState, useRef } from 'react'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
