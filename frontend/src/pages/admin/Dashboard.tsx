@@ -161,14 +161,23 @@ export default function Dashboard() {
       if (filterEmail) baseFilters.email = filterEmail
       if (filterKit) baseFilters.kitType = filterKit
 
+      let activeTotalElements = exactTotalOrders
+      let activeMaxBackendPage = exactTotalOrders > 0 ? Math.max(0, Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE) - 1) : 0
+
+      const hasFilters = !!(filterStatus || filterEmail || filterKit)
+      if (hasFilters) {
+        const preflight = await api.orders.list({ ...baseFilters, page: '0', size: '1' })
+        activeTotalElements = preflight.totalElements > 0 ? preflight.totalElements : 0
+        activeMaxBackendPage = preflight.totalPages > 0 ? preflight.totalPages - 1 : 0
+      }
+
       const backendStartPage = page * pagesNeeded
-      const maxBackendPage = exactTotalOrders > 0 ? Math.max(0, Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE) - 1) : 0
 
       const fetches = Array.from({ length: pagesNeeded }, (_, i) => {
         let targetPage = backendStartPage + i
         // Fetch starting from the highest ID because the backend refuses to sort it server-side!
-        if (exactTotalOrders > 0) {
-          targetPage = Math.max(0, maxBackendPage - targetPage)
+        if (activeTotalElements > 0) {
+          targetPage = Math.max(0, activeMaxBackendPage - targetPage)
         }
         return api.orders.list({ ...baseFilters, page: String(targetPage), size: String(BACKEND_PAGE_SIZE) })
       })
@@ -177,20 +186,18 @@ export default function Dashboard() {
       // Merge items from all sub-pages
       const items = results.flatMap((r) => r.items)
 
-      // Use metadata from first result
-      const first = results[0]
       return {
         items,
-        totalElements: first?.totalElements ?? -1,
-        totalPages: first?.totalPages ?? -1,
+        totalElements: activeTotalElements,
+        totalPages: activeTotalElements > 0 ? Math.ceil(activeTotalElements / BACKEND_PAGE_SIZE) : 0,
       }
     },
     placeholderData: (prev) => prev,
   })
   const orders = queryData?.items ?? []
 
-  // Use exact math from totalOrders avoiding backend -1
-  const totalElements = exactTotalOrders > 0 ? exactTotalOrders : orders.length > pageSize ? orders.length : 0
+  // Use exact math from the dynamic query data
+  const totalElements = queryData?.totalElements ?? 0
   const totalPages = totalElements > 0 ? Math.ceil(totalElements / pageSize) : 1
   const lastPage = Math.max(0, totalPages - 1)
 
