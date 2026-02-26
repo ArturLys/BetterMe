@@ -44,7 +44,6 @@ import {
   Moon,
   ChevronDown,
   X,
-  ChevronsRight,
 } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -240,20 +239,6 @@ export default function Dashboard() {
     setDeleteTarget(null)
   }
 
-  // const handleTogglePaid = async (order: Order) => {
-  //   try {
-  //     if ((order.paymentStatus ?? 'NOT_PAID') === 'NOT_PAID') {
-  //       await api.orders.setPaid(order.id)
-  //       toast(t('dash.orders.paid'), 'success')
-  //       qc.invalidateQueries({ queryKey: ['orders'] })
-  //     } else {
-  //       toast(t('dash.orders.unpaid'), 'info')
-  //     }
-  //   } catch (err: any) {
-  //     toast(err.message, 'error')
-  //   }
-  // }
-
   const handleCreate = async () => {
     setCreateLoading(true)
     try {
@@ -302,7 +287,14 @@ export default function Dashboard() {
   const handleEditSave = async () => {
     if (!editOrder) return
     try {
-      if (editOrder.paymentStatus === 'PAID') await api.orders.setPaid(editOrder.id)
+      await api.orders.update(editOrder.id, {
+        receiverEmail: editOrder.receiverEmail,
+        kitType: editOrder.kitType,
+        orderStatus: editOrder.orderStatus,
+        subtotal: editOrder.subtotal,
+        latitude: editOrder.latitude,
+        longitude: editOrder.longitude,
+      })
       toast(t('dash.edit.saved'), 'success')
       setEditOpen(false)
       qc.invalidateQueries({ queryKey: ['orders'] })
@@ -313,7 +305,7 @@ export default function Dashboard() {
 
   const kitLabel = (kit: string) => KIT_INFO[kit as KitType]?.label ?? kit
 
-  const hasNextPage = orders.length >= pageSize || (lastPage >= 0 && page < lastPage)
+  const hasNextPage = lastPage >= 0 && page < lastPage
   const hasPrevPage = page > 0
 
   // ═══════════════════════════════════════════
@@ -747,24 +739,11 @@ export default function Dashboard() {
               {/* Next */}
               <PaginationItem>
                 <PaginationNext
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
                   className={!hasNextPage ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                   label={t('dash.page.next')}
                 />
               </PaginationItem>
-              {/* Last page */}
-              {lastPage >= 0 && (
-                <PaginationItem>
-                  <button
-                    onClick={() => setPage(lastPage)}
-                    disabled={page >= lastPage}
-                    className={`inline-flex items-center justify-center h-9 w-9 rounded-md text-sm ${page >= lastPage ? 'pointer-events-none opacity-50' : 'hover:bg-muted cursor-pointer'}`}
-                    title='Last'
-                  >
-                    <ChevronsRight size={16} />
-                  </button>
-                </PaginationItem>
-              )}
             </PaginationContent>
           </Pagination>
 

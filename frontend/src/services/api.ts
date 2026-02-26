@@ -90,7 +90,7 @@ export const api = {
     getStats: () => request<OrderStats>('/orders/stats'),
     getById: (id: number) => request<Order>(`/orders/${id}`),
     create: (dto: OrderCreateDTO) => request<number>('/orders', { method: 'POST', body: JSON.stringify(dto) }),
-    setPaid: (id: number) => request<void>(`/orders/${id}`, { method: 'PATCH' }),
+    update: (id: number, order: Partial<Order>) => request<Order>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(order) }),
     delete: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
   },
 }
