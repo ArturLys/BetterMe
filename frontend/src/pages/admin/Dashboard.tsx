@@ -378,8 +378,8 @@ export default function Dashboard() {
             <div className="w-7 h-7 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
               <span className="text-xs font-bold text-white">B</span>
             </div>
-            <span className="font-semibold hidden min-[400px]:inline">BetterMe</span>
-            <Badge variant="secondary" className="text-xs">
+            <span className='font-semibold hidden min-[460px]:inline'>BetterMe</span>
+            <Badge variant='secondary' className='text-xs'>
               {t('dash.admin')}
             </Badge>
           </div>
@@ -837,9 +837,9 @@ export default function Dashboard() {
           </Pagination>
 
           {/* Page info */}
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {t('dash.page.label')} {page + 1}
-            {totalPages > 0 ? ` / ${totalPages}` : ''}
+          <span className='text-xs text-muted-foreground whitespace-nowrap'>
+            {/* {t('dash.page.label')} {page + 1}
+            {totalPages > 0 ? ` / ${totalPages}` : ''} */}
           </span>
         </div>
       </main>
