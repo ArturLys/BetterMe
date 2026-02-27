@@ -148,7 +148,7 @@ export default function TrackPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">{t('track.placed')}</span>
-                <p className="font-medium">{order.timestamp ? order.timestamp.slice(0, 10) : '—'}</p>
+                <p className="font-medium">{order.timestamp ? order.timestamp.slice(0, 16).replace('T', ' ') : '—'}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">{t('dash.orders.subtotal')}</span>
