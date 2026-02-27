@@ -1,8 +1,19 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
-export type KitType = 'DEFAULT' | 'DEFAULT_PLUS' | 'SILVER' | 'SILVER_PLUS' | 'GOLD' | 'GOLD_PLUS' | 'PLATINUM' | 'PLATINUM_PLUS'
+export type KitType =
+  | 'DEFAULT'
+  | 'DEFAULT_PLUS'
+  | 'SILVER'
+  | 'SILVER_PLUS'
+  | 'GOLD'
+  | 'GOLD_PLUS'
+  | 'PLATINUM'
+  | 'PLATINUM_PLUS'
 
-export const KIT_INFO: Record<KitType, { label: string; price: number; tier: 'default' | 'silver' | 'gold' | 'platinum'; plus: boolean }> = {
+export const KIT_INFO: Record<
+  KitType,
+  { label: string; price: number; tier: 'default' | 'silver' | 'gold' | 'platinum'; plus: boolean }
+> = {
   DEFAULT: { label: 'Default', price: 22, tier: 'default', plus: false },
   DEFAULT_PLUS: { label: 'Default+', price: 25, tier: 'default', plus: true },
   SILVER: { label: 'Silver', price: 45, tier: 'silver', plus: false },
@@ -94,7 +105,9 @@ export const api = {
     getStats: () => request<OrderStats>('/orders/stats'),
     getById: (id: number) => request<Order>(`/orders/${id}`),
     create: (dto: OrderCreateDTO) => request<number>('/orders', { method: 'POST', body: JSON.stringify(dto) }),
-    update: (id: number, order: Partial<Order>) => request<Order>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(order) }),
+    update: (id: number, order: Partial<Order>) =>
+      request<Order>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(order) }),
     delete: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
+    pay: (id: number) => request<void>(`/orders/pay/${id}`, { method: 'POST' }),
   },
 }

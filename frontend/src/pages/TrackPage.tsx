@@ -24,6 +24,7 @@ export default function TrackPage() {
   const [orderId, setOrderId] = useState('')
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(false)
+  const [paying, setPaying] = useState(false)
   const [searched, setSearched] = useState(false)
   const [searchParams] = useSearchParams()
 
@@ -40,6 +41,20 @@ export default function TrackPage() {
       toast(t('track.notfound'), 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePay = async () => {
+    if (!order) return
+    setPaying(true)
+    try {
+      await api.orders.pay(order.id)
+      toast(t('track.paySuccess') || 'Payment successful!', 'success')
+      await fetchOrder(String(order.id))
+    } catch {
+      toast(t('track.payError') || 'Payment failed. Please try again.', 'error')
+    } finally {
+      setPaying(false)
     }
   }
 
@@ -60,33 +75,34 @@ export default function TrackPage() {
   const progress = order?.deliveryProgress ?? 0
   const payment = order?.paymentStatus ?? '—'
   const kitLabel = order ? (KIT_INFO[order.kitType as KitType]?.label ?? order.kitType) : ''
+  const needsPayment = order?.orderStatus === 'WAITING_FOR_PAYMENT'
 
   return (
-    <main className='max-w-lg mx-auto p-4 sm:p-6 mt-8'>
-      <Card className='backdrop-blur-sm bg-card/80 mb-6'>
+    <main className="max-w-lg mx-auto p-4 sm:p-6 mt-8">
+      <Card className="backdrop-blur-sm bg-card/80 mb-6">
         <CardHeader>
-          <CardTitle className='text-2xl'>{t('track.title')}</CardTitle>
+          <CardTitle className="text-2xl">{t('track.title')}</CardTitle>
           <CardDescription>{t('track.subtitle')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className='flex gap-2'>
-            <div className='flex-1 space-y-2'>
-              <Label htmlFor='orderId' className='sr-only'>
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="orderId" className="sr-only">
                 {t('track.id')}
               </Label>
               <Input
-                id='orderId'
+                id="orderId"
                 placeholder={t('track.id')}
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
                 required
-                className='font-mono text-sm'
+                className="font-mono text-sm"
               />
             </div>
             <Button
-              type='submit'
+              type="submit"
               disabled={loading}
-              className='bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white'
+              className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white"
             >
               {loading ? t('track.submit.loading') : t('track.submit')}
             </Button>
@@ -96,54 +112,107 @@ export default function TrackPage() {
 
       {/* Result */}
       {order && (
-        <Card className='overflow-hidden animate-[fadeIn_0.3s_ease-out]'>
-          <CardHeader className='pb-3'>
-            <div className='flex items-center justify-between'>
-              <CardTitle className='text-lg font-mono'>#{order.id}</CardTitle>
+        <Card className="overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-mono">#{order.id}</CardTitle>
               <Badge className={`${STATUS_COLORS[order.orderStatus] || ''} border`}>
                 {t(`dash.status.${order.orderStatus.toLowerCase()}` as any) || order.orderStatus.replace(/_/g, ' ')}
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className='space-y-4'>
+          <CardContent className="space-y-4">
             {/* Progress bar */}
             <div>
-              <div className='flex justify-between text-xs text-muted-foreground mb-1'>
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
                 <span>{t('track.progress')}</span>
                 <span>{progress}%</span>
               </div>
-              <div className='h-2 rounded-full bg-muted overflow-hidden'>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
                 <div
-                  className='h-full rounded-full bg-linear-to-r from-emerald-500 to-teal-500 transition-all duration-500'
+                  className="h-full rounded-full bg-linear-to-r from-emerald-500 to-teal-500 transition-all duration-500"
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
             {/* Details */}
-            <div className='grid grid-cols-2 gap-3 text-sm'>
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <span className='text-muted-foreground'>{t('track.kit')}</span>
-                <p className='font-medium'>{kitLabel}</p>
+                <span className="text-muted-foreground">{t('track.kit')}</span>
+                <p className="font-medium">{kitLabel}</p>
               </div>
               <div>
-                <span className='text-muted-foreground'>{t('track.payment')}</span>
-                <p className='font-medium'>{payment.replace(/_/g, ' ')}</p>
+                <span className="text-muted-foreground">{t('track.payment')}</span>
+                <p className="font-medium">{payment.replace(/_/g, ' ')}</p>
               </div>
               <div>
-                <span className='text-muted-foreground'>{t('track.placed')}</span>
-                <p className='font-medium'>{order.timestamp ? order.timestamp.slice(0, 10) : '—'}</p>
+                <span className="text-muted-foreground">{t('track.placed')}</span>
+                <p className="font-medium">{order.timestamp ? order.timestamp.slice(0, 10) : '—'}</p>
               </div>
               <div>
-                <span className='text-muted-foreground'>{t('dash.orders.subtotal')}</span>
-                <p className='font-medium'>${order.subtotal}</p>
+                <span className="text-muted-foreground">{t('dash.orders.subtotal')}</span>
+                <p className="font-medium">${order.subtotal}</p>
               </div>
             </div>
+
+            {/* Pay Order Button */}
+            {needsPayment && (
+              <div className="pt-2">
+                <Button
+                  id="pay-order-btn"
+                  onClick={handlePay}
+                  disabled={paying}
+                  className="w-full relative overflow-hidden bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold py-5 text-base shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  {paying ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      {t('track.paying') || 'Processing…'}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                        <path
+                          fillRule="evenodd"
+                          d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      {t('track.pay') || 'Pay Order'}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {searched && !loading && !order && <p className='text-center text-muted-foreground mt-8'>{t('track.notfound')}</p>}
+      {searched && !loading && !order && (
+        <p className="text-center text-muted-foreground mt-8">{t('track.notfound')}</p>
+      )}
     </main>
   )
 }

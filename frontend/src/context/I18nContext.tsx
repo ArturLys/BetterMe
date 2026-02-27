@@ -143,6 +143,10 @@ const translations = {
     'track.payment': 'Оплата',
     'track.placed': 'Дата замовлення',
     'track.delivered': 'Дата доставки',
+    'track.pay': 'Оплатити замовлення',
+    'track.paying': 'Обробляємо…',
+    'track.paySuccess': 'Оплата успішна!',
+    'track.payError': 'Помилка оплати. Спробуйте ще раз.',
 
     loading: 'Завантаження...',
   },
@@ -273,6 +277,10 @@ const translations = {
     'track.payment': 'Payment',
     'track.placed': 'Placed on',
     'track.delivered': 'Delivered on',
+    'track.pay': 'Pay Order',
+    'track.paying': 'Processing…',
+    'track.paySuccess': 'Payment successful!',
+    'track.payError': 'Payment failed. Please try again.',
 
     loading: 'Loading...',
   },
