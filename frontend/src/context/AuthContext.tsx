@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 export interface User {
-  login: string
+  username: string
 }
 
 export interface Session {
@@ -12,8 +12,8 @@ interface AuthState {
   user: User | null
   session: Session | null
   loading: boolean
-  signIn: (login: string, password: string) => Promise<{ error: any }>
-  signUp: (login: string, password: string) => Promise<{ error: any }>
+  signIn: (username: string, password: string) => Promise<{ error: any }>
+  signUp: (username: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
 }
 
@@ -25,16 +25,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user')
+    const savedUserStr = localStorage.getItem('user')
     const savedToken = localStorage.getItem('token') || 'mock-token'
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
-      setSession({ token: savedToken })
+    if (savedUserStr) {
+      try {
+        const savedUser = JSON.parse(savedUserStr)
+        // Migration: if it has old 'login' field, use it as 'username'
+        if (savedUser.login && !savedUser.username) {
+          savedUser.username = savedUser.login
+          delete savedUser.login
+        }
+        setUser(savedUser)
+        setSession({ token: savedToken })
+      } catch (e) {
+        console.error('Failed to parse saved user', e)
+      }
     }
     setLoading(false)
   }, [])
 
-  const signIn = async (login: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || '/api'
       const res = await fetch(`${API_URL}/auth/login`, {
@@ -42,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username: login, password }),
+        body: JSON.stringify({ username, password }),
       })
 
       if (!res.ok) {
@@ -60,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (text && text.trim().length > 0) token = text.trim()
       }
 
-      const userObj = { login }
+      const userObj = { username }
       setUser(userObj)
       setSession({ token })
       localStorage.setItem('user', JSON.stringify(userObj))
@@ -72,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const signUp = async (_login: string, _password: string) => {
+  const signUp = async (_username: string, _password: string) => {
     // Hide register for now as requested
     return { error: { message: 'Registration is disabled for now.' } }
   }
@@ -84,7 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token')
   }
 
-  return <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>{children}</AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
