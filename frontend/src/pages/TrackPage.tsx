@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
@@ -43,18 +43,6 @@ const STATUS_COLORS: Record<string, string> = {
   DELIVERED: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
   RECEIVED: 'bg-green-500/10 text-green-500 border-green-500/20',
   WAITING_FOR_PAYMENT: 'bg-red-500/10 text-red-500 border-red-500/20',
-}
-
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371e3
-  const x1 = (lat1 * Math.PI) / 180
-  const x2 = (lat2 * Math.PI) / 180
-  const dx = ((lat2 - lat1) * Math.PI) / 180
-  const dy = ((lon2 - lon1) * Math.PI) / 180
-
-  const a = Math.sin(dx / 2) * Math.sin(dx / 2) + Math.cos(x1) * Math.cos(x2) * Math.sin(dy / 2) * Math.sin(dy / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
 }
 
 export default function TrackPage() {
@@ -130,40 +118,9 @@ export default function TrackPage() {
     await fetchOrder(orderId)
   }
 
-  const progressVal = order?.drone?.progress ?? order?.distance ?? 0
-  let progress = progressVal
-  if (
-    order?.orderStatus === 'ON_THE_WAY' &&
-    order.drone?.currentLatitude &&
-    order.drone?.currentLongitude &&
-    droneHome
-  ) {
-    const totalDist = getDistance(droneHome.latitude, droneHome.longitude, order.latitude, order.longitude)
-    const currentDist = getDistance(
-      droneHome.latitude,
-      droneHome.longitude,
-      order.drone.currentLatitude,
-      order.drone.currentLongitude
-    )
-    progress = totalDist > 0 ? Math.min(100, Math.max(0, Math.round((currentDist / totalDist) * 100))) : 0
-  } else if (
-    order?.orderStatus === 'RETURNING' &&
-    order.drone?.currentLatitude &&
-    order.drone?.currentLongitude &&
-    droneHome
-  ) {
-    const totalDist = getDistance(order.latitude, order.longitude, droneHome.latitude, droneHome.longitude)
-    const currentDist = getDistance(
-      order.latitude,
-      order.longitude,
-      order.drone.currentLatitude,
-      order.drone.currentLongitude
-    )
-    progress = totalDist > 0 ? Math.min(100, Math.max(0, Math.round((currentDist / totalDist) * 100))) : 0
-  } else if (order?.orderStatus === 'DELIVERED' || order?.orderStatus === 'RECEIVED') {
+  let progress = order?.drone?.progress ?? order?.distance ?? 0
+  if (order?.orderStatus === 'DELIVERED' || order?.orderStatus === 'RECEIVED') {
     progress = 100
-  } else {
-    progress = progressVal
   }
 
   const payment = order?.paymentStatus ?? '—'
@@ -288,7 +245,24 @@ export default function TrackPage() {
                   {order.orderStatus !== 'DELIVERED' &&
                     order.orderStatus !== 'RECEIVED' &&
                     effDroneLat &&
-                    effDroneLng && <Marker position={[effDroneLat, effDroneLng]} icon={droneIcon} />}
+                    effDroneLng && (
+                      <>
+                        <Marker position={[effDroneLat, effDroneLng]} icon={droneIcon}>
+                          <Tooltip direction="top" offset={[0, -20]} opacity={0.9} permanent>
+                            {progress}%
+                          </Tooltip>
+                        </Marker>
+                        <Polyline
+                          positions={[
+                            [effDroneLat, effDroneLng],
+                            [order.latitude, order.longitude],
+                          ]}
+                          color="blue"
+                          dashArray="5, 10"
+                          opacity={0.5}
+                        />
+                      </>
+                    )}
                 </MapContainer>
               </div>
             )}
