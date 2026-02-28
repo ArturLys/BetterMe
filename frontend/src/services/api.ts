@@ -41,7 +41,7 @@ export interface Order {
   kitType: KitType
   orderStatus: string
   paymentStatus?: string
-  deliveryProgress?: number
+  drone?: Partial<DroneDetails> | null
 }
 
 export interface OrderCreateDTO {
@@ -61,6 +61,34 @@ export interface OrderStats {
   totalOrders: number
   totalTax: number
   totalPending: number
+}
+
+export interface Drone {
+  id: number
+  status: string
+  progress?: number
+}
+
+export interface DroneLog {
+  droneId: number
+  order: Order
+  startedAt: string
+  finishedAt: string
+  status: string
+}
+
+export interface DroneDetails {
+  status: string
+  progress: number
+  currentOrder: Order | null
+  currentLatitude: number
+  currentLongitude: number
+  logs: DroneLog[]
+}
+
+export interface DroneHome {
+  latitude: number
+  longitude: number
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -109,5 +137,86 @@ export const api = {
       request<Order>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(order) }),
     delete: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
     pay: (id: number) => request<void>(`/orders/pay/${id}`, { method: 'POST' }),
+  },
+  drones: {
+    list: async () => {
+      try {
+        return await request<Drone[]>('/drones')
+      } catch {
+        return [
+          { id: 1, status: 'FREE' },
+          { id: 2, status: 'FREE' },
+          { id: 3, status: 'OCCUPIED' },
+          { id: 4, status: 'OCCUPIED' },
+          { id: 5, status: 'FREE' },
+          { id: 6, status: 'FREE' },
+          { id: 7, status: 'OCCUPIED' },
+          { id: 8, status: 'FREE' },
+        ]
+      }
+    },
+    getById: async (id: number) => {
+      try {
+        return await request<DroneDetails>(`/drones/${id}`)
+      } catch {
+        const isOccupied = id === 3 || id === 4 || id === 7
+        return {
+          status: isOccupied ? 'OCCUPIED' : 'FREE',
+          progress: isOccupied ? 50 : 0,
+          currentOrder: isOccupied
+            ? ({
+                id: 200 + id,
+                receiverEmail: 'mock@example.com',
+                latitude: 40.722,
+                longitude: -73.767,
+                orderStatus: 'ORDERED',
+                kitType: 'DEFAULT',
+              } as Order)
+            : null,
+          currentLatitude: 40.7128,
+          currentLongitude: -74.006,
+          logs: isOccupied
+            ? [
+                {
+                  droneId: id,
+                  order: {
+                    id: 200 + id,
+                    receiverEmail: 'mock@example.com',
+                    latitude: 40.722,
+                    longitude: -73.767,
+                    orderStatus: 'ORDERED',
+                    kitType: 'DEFAULT',
+                  } as Order,
+                  startedAt: new Date(Date.now() - 3600000).toISOString(),
+                  finishedAt: new Date(Date.now() - 1800000).toISOString(),
+                  status: 'COMPLETED',
+                },
+                {
+                  droneId: id,
+                  order: {
+                    id: 300 + id,
+                    receiverEmail: 'mock2@example.com',
+                    latitude: 40.75,
+                    longitude: -73.98,
+                    orderStatus: 'ON_THE_WAY',
+                    kitType: 'GOLD',
+                  } as Order,
+                  startedAt: new Date(Date.now() - 600000).toISOString(),
+                  finishedAt: new Date(Date.now() + 600000).toISOString(),
+                  status: 'IN_PROGRESS',
+                },
+              ]
+            : [],
+        }
+      }
+    },
+    home: async () => {
+      try {
+        return await request<DroneHome>('/drones/home')
+      } catch {
+        return { latitude: 40.7128, longitude: -74.006 }
+      }
+    },
+    facilitate: () => request<void>('/drones/facilitate', { method: 'POST' }),
   },
 }

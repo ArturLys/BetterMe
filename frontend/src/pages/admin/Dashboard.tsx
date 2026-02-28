@@ -47,6 +47,7 @@ import {
   RefreshCw,
   Upload,
   PlusCircle,
+  Plane,
   Sun,
   Moon,
   ChevronDown,
@@ -130,6 +131,8 @@ export default function Dashboard() {
 
   const [csvOpen, setCsvOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [dronesOpen, setDronesOpen] = useState(false)
+  const [selectedDroneId, setSelectedDroneId] = useState<number | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [mapOpen, setMapOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -152,21 +155,12 @@ export default function Dashboard() {
   }, [])
 
   // ─── React Query ───
-  // Backend returns 10 per page. We fetch multiple backend pages to fill user's pageSize.
-  const BACKEND_PAGE_SIZE = 10
-  const pagesNeeded = Math.ceil(pageSize / BACKEND_PAGE_SIZE)
-
-  const queryKey = ['orders', page, pageSize, filterStatus, filterEmail, filterKit]
+  const queryKey = ['orders', page, pageSize, filterStatus, filterEmail, filterKit, sortField, sortDir]
 
   const { data: statsData } = useQuery({
     queryKey: ['stats'],
     queryFn: api.orders.getStats,
   })
-
-  // We explicitly keep totalOrders in local state as fallback for perfect math
-  if (statsData?.totalOrders) localStorage.setItem('cachedTotalOrders', String(statsData.totalOrders))
-  const cachedTotalOrders = parseInt(localStorage.getItem('cachedTotalOrders') || '0', 10)
-  const exactTotalOrders = statsData?.totalOrders || cachedTotalOrders
 
   const {
     data: queryData,
@@ -176,91 +170,49 @@ export default function Dashboard() {
   } = useQuery({
     queryKey,
     queryFn: async (): Promise<{ items: Order[]; totalElements: number; totalPages: number }> => {
-      const baseFilters: Record<string, string> = { sort: 'id,desc' }
+      const baseFilters: Record<string, string> = { sort: `${sortField},${sortDir}` }
       if (filterStatus) baseFilters.orderStatus = filterStatus
       if (filterEmail) baseFilters.email = filterEmail
       if (filterKit) baseFilters.kitType = filterKit
 
-      let fetchedItems: Order[] = []
-      let totalFetchedElements = -1
-      let totalFetchedPages = -1
-
-      const hasFilters = !!(filterStatus || filterEmail || filterKit)
-
-      if (exactTotalOrders > 0 && !hasFilters) {
-        // We want `pageSize` items ending at the very end of the database.
-        const endIndex = exactTotalOrders - page * pageSize
-        const startIndex = Math.max(0, endIndex - pageSize)
-
-        if (startIndex < endIndex) {
-          const startPage = Math.floor(startIndex / BACKEND_PAGE_SIZE)
-          const endPage = Math.floor((endIndex - 1) / BACKEND_PAGE_SIZE)
-
-          const fetches = []
-          for (let p = startPage; p <= endPage; p++) {
-            fetches.push(api.orders.list({ ...baseFilters, page: String(p), size: String(BACKEND_PAGE_SIZE) }))
-          }
-          const results = await Promise.all(fetches)
-          const merged = results.flatMap((r) => r.items)
-
-          // Slice the exact items we need (compensating for the fact that the first loaded page might contain items from before startIndex)
-          const localStartIndex = startIndex - startPage * BACKEND_PAGE_SIZE
-          const localEndIndex = endIndex - startPage * BACKEND_PAGE_SIZE
-          fetchedItems = merged.slice(localStartIndex, localEndIndex)
-        }
-        totalFetchedElements = exactTotalOrders
-        totalFetchedPages = Math.ceil(exactTotalOrders / BACKEND_PAGE_SIZE)
-      } else {
-        const backendStartPage = page * pagesNeeded
-        const fetches = Array.from({ length: pagesNeeded }, (_, i) => {
-          return api.orders.list({
-            ...baseFilters,
-            page: String(backendStartPage + i),
-            size: String(BACKEND_PAGE_SIZE),
-          })
-        })
-        const results = await Promise.all(fetches)
-        fetchedItems = results.flatMap((r) => r.items)
-        if (results[0]) {
-          totalFetchedElements = results[0].totalElements ?? -1
-          totalFetchedPages = results[0].totalPages ?? -1
-        }
-      }
+      const res = await api.orders.list({
+        ...baseFilters,
+        page: String(page),
+        size: String(pageSize),
+      })
 
       return {
-        items: fetchedItems,
-        totalElements: totalFetchedElements,
-        totalPages: totalFetchedPages,
+        items: res.items,
+        totalElements: res.totalElements,
+        totalPages: res.totalPages,
       }
     },
     placeholderData: (prev) => prev,
   })
   const orders = queryData?.items ?? []
 
-  // Use exact math from totalOrders avoiding backend -1, but prioritize queryData if the backend gave it to us
-  const totalElements =
-    queryData?.totalElements && queryData.totalElements > 0
-      ? queryData.totalElements
-      : exactTotalOrders > 0
-        ? exactTotalOrders
-        : orders.length > pageSize
-          ? orders.length
-          : 0
-  const totalPages = totalElements > 0 ? Math.ceil(totalElements / pageSize) : 1
+  const totalElements = queryData?.totalElements && queryData.totalElements > 0 ? queryData.totalElements : 0
+  const totalPages = queryData?.totalPages && queryData.totalPages > 0 ? queryData.totalPages : 1
   const lastPage = Math.max(0, totalPages - 1)
 
   const error = queryError ? (queryError as Error).message : null
 
-  // ─── Client-side sort (within current page) ───
-  const sortedOrders = [...orders].sort((a, b) => {
-    if (sortField === 'id') {
-      return sortDir === 'asc' ? a.id - b.id : b.id - a.id
-    }
-    const av = a[sortField] ?? ''
-    const bv = b[sortField] ?? ''
-    const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true })
-    return sortDir === 'asc' ? cmp : -cmp
+  // ─── Drones Query ───
+  const { data: drones, isLoading: loadingDrones } = useQuery({
+    queryKey: ['drones'],
+    queryFn: api.drones.list,
+    enabled: dronesOpen,
   })
+
+  const { data: droneDetails, isLoading: loadingDroneDetails } = useQuery({
+    queryKey: ['drone', selectedDroneId],
+    queryFn: () => (selectedDroneId ? api.drones.getById(selectedDroneId) : null),
+    enabled: !!selectedDroneId && dronesOpen,
+  })
+
+  // ─── Table data ───
+
+  const sortedOrders = orders
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -378,8 +330,8 @@ export default function Dashboard() {
             <div className="w-7 h-7 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
               <span className="text-xs font-bold text-white">B</span>
             </div>
-            <span className='font-semibold hidden min-[460px]:inline'>BetterMe</span>
-            <Badge variant='secondary' className='text-xs'>
+            <span className="font-semibold hidden min-[460px]:inline">BetterMe</span>
+            <Badge variant="secondary" className="text-xs">
               {t('dash.admin')}
             </Badge>
           </div>
@@ -449,6 +401,9 @@ export default function Dashboard() {
             <p className="text-muted-foreground mt-1 text-sm sm:text-base">{t('dash.subtitle')}</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDronesOpen(true)}>
+              <Plane size={14} className="mr-1" /> {t('dash.drones' as any) || 'Manage Drones'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setCsvOpen(true)}>
               <Upload size={14} className="mr-1" /> CSV
             </Button>
@@ -837,7 +792,7 @@ export default function Dashboard() {
           </Pagination>
 
           {/* Page info */}
-          <span className='text-xs text-muted-foreground whitespace-nowrap'>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
             {/* {t('dash.page.label')} {page + 1}
             {totalPages > 0 ? ` / ${totalPages}` : ''} */}
           </span>
@@ -1118,6 +1073,100 @@ export default function Dashboard() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setMapOpen(false)}>
               {t('dash.btn.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Drones Dialog ═══ */}
+      <Dialog open={dronesOpen} onOpenChange={setDronesOpen}>
+        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plane size={18} /> {t('dash.drones' as any) || 'Manage Drones'}
+            </DialogTitle>
+            <DialogDescription>{t('dash.drones.desc' as any) || 'View drone statuses and logs'}</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto space-y-4">
+            {loadingDrones ? (
+              <div className="flex justify-center p-8">
+                <RefreshCw className="animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {drones?.map((drone) => (
+                  <Card
+                    key={drone.id}
+                    className={`cursor-pointer transition-all ${selectedDroneId === drone.id ? 'border-primary ring-1 ring-primary' : 'hover:border-primary/50'}`}
+                    onClick={() => setSelectedDroneId(drone.id)}
+                  >
+                    <CardHeader className="py-3 px-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm">Drone #{drone.id}</span>
+                        <Badge
+                          variant="outline"
+                          className={drone.status === 'FREE' ? 'text-emerald-500' : 'text-amber-500'}
+                        >
+                          {t(`dash.drones.status.${drone.status}` as any) || drone.status}
+                          {drone.status === 'OCCUPIED' && drone.progress !== undefined ? ` (${drone.progress}%)` : ''}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {selectedDroneId && (
+              <div className="mt-6 border-t pt-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Package size={16} /> Logs for Drone #{selectedDroneId}
+                </h3>
+                {loadingDroneDetails ? (
+                  <div className="flex justify-center p-4">
+                    <RefreshCw size={16} className="animate-spin text-muted-foreground" />
+                  </div>
+                ) : !droneDetails?.logs?.length ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t('dash.drones.logs.empty' as any) || 'No logs found.'}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {[...(droneDetails?.logs || [])]
+                      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+                      .map((log, idx) => (
+                        <div key={idx} className="bg-muted p-3 rounded-md text-sm border">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium text-xs">
+                              {t('dash.drones.log.order' as any) || 'Order'} #{log.order.id}
+                            </span>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {t(`dash.drones.log.status.${log.status}` as any) || log.status}
+                            </Badge>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground grid gap-1">
+                            <span>
+                              {t('dash.drones.log.lat' as any) || 'Lat'}: {log.order.latitude},{' '}
+                              {t('dash.drones.log.lng' as any) || 'Lng'}: {log.order.longitude}
+                            </span>
+                            <span>
+                              {t('dash.drones.log.start' as any) || 'Start'}: {log.startedAt.replace('T', ' ')}
+                            </span>
+                            <span>
+                              {t('dash.drones.log.end' as any) || 'End'}: {log.finishedAt.replace('T', ' ')}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDronesOpen(false)}>
+              {t('dash.btn.close') || 'Close'}
             </Button>
           </DialogFooter>
         </DialogContent>
