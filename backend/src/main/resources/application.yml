@@ -1,0 +1,54 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+
+  application:
+    name: PlaceholderDrones
+
+  datasource:
+    hikari:
+      auto-commit: true
+    username: ${DATASOURCE_USERNAME:postgres}
+    password: ${DATASOURCE_PASSWORD:postgres}
+    url: ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/postgres}
+    driver-class-name: ${DATASOURCE_DRIVER:org.postgresql.Driver}
+
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: ${DDL_AUTO:create}
+
+  security:
+    cors:
+      allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
+
+
+    jwt:
+      access-token:
+        secret: ${ACCESS_TOKEN_SECRET:secretsecretsecretsecretsecretsecretsecretsecretsecretsecretsecretsecretsecretsecret}
+        exp-min: ${ACCESS_TOKEN_EXP_MIN:30}
+      cookie:
+        same-site: ${COOKIE_SAME_SITE:Lax}
+        secure: ${COOKIE_SECURE:false}
+        http-only: ${COOKIE_HTTP_ONLY:true}
+        path: ${COOKIE_PATH:/}
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:localhost:9000}
+
+  config:
+    import: optional:file:.env[.properties]
+placeholder-drones:
+  search:
+    filtered-search-page-size: ${FILTERED_SEARCH_PAGE_SIZE:10}
+  delivery:
+    origin:
+      latitude: ${ORIGIN_LAT:40.7128}
+      longitude: ${ORIGIN_LON:-74.0060}
+  tax:
+    default-tax-rate: ${DEFAULT_TAX_RATE:0.08}
+  files:
+    county-file-name: ${COUNTY_FILES_NAME:ny-counties.geojson}
+    tax-rates-file-name: ${COUNTY_FILES_NAME:county-rates.csv}

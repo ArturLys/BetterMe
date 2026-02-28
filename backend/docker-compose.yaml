@@ -1,0 +1,11 @@
+services:
+
+  drones_db:
+    image: postgres:alpine
+    container_name: drones_db
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
