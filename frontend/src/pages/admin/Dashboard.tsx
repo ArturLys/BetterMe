@@ -1,7 +1,7 @@
 // God component, more like cute component :3
 
 import { useEffect, useState, useRef } from 'react'
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip } from 'react-leaflet'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../context/I18nContext'
@@ -65,6 +65,23 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+const droneSVG = `
+<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12 21V11"/>
+  <path d="M22 11c0 2.2-2 4-5 4-2.8 0-5-1.8-5-4s2.2-4 5-4 5 1.8 5 4z"/>
+  <path d="M12 11c0 2.2-2 4-5 4-2.8 0-5-1.8-5-4s2.2-4 5-4 5 1.8 5 4z"/>
+  <path d="M17 7 7 15"/>
+  <path d="M7 7l10 8"/>
+</svg>
+`
+
+const droneIcon = new L.Icon({
+  iconUrl: `data:image/svg+xml;base64,${btoa(droneSVG)}`,
+  iconSize: [48, 48],
+  iconAnchor: [24, 24],
+  popupAnchor: [0, -24],
 })
 
 const TIER_IMAGES: Record<string, string | null> = {
@@ -1067,6 +1084,31 @@ export default function Dashboard() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <Marker position={[mapOrder.latitude, mapOrder.longitude]} />
+                {mapOrder.orderStatus !== 'DELIVERED' &&
+                  mapOrder.orderStatus !== 'RECEIVED' &&
+                  mapOrder.drone &&
+                  mapOrder.drone.currentLatitude &&
+                  mapOrder.drone.currentLongitude && (
+                    <>
+                      <Marker
+                        position={[mapOrder.drone.currentLatitude, mapOrder.drone.currentLongitude]}
+                        icon={droneIcon}
+                      >
+                        <Tooltip direction="top" offset={[0, -20]} opacity={0.9} permanent>
+                          {mapOrder.drone.progress ?? 0}%
+                        </Tooltip>
+                      </Marker>
+                      <Polyline
+                        positions={[
+                          [mapOrder.drone.currentLatitude, mapOrder.drone.currentLongitude],
+                          [mapOrder.latitude, mapOrder.longitude],
+                        ]}
+                        color="blue"
+                        dashArray="5, 10"
+                        opacity={0.5}
+                      />
+                    </>
+                  )}
               </MapContainer>
             </div>
           )}
