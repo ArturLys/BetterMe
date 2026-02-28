@@ -25,26 +25,75 @@
 
 ## Бекенд
 
+# 🚁 Placeholder Drones Backend
+
+Backend-сервіс для управління доставкою дронів, замовленнями, оплатами та відстеженням руху дронів у реальному часі.
+
+Проєкт побудований на **Spring Boot 4**, **Hibernate 7**, **PostgreSQL** та готовий до деплою через **Docker / Railway / Supabase**.
+
+---
+
+## ✨ Основний функціонал
+
+- 📦 Створення та управління замовленнями
+- 🔎 Фільтрація замовлень через JPA Specifications
+- 📊 Статистика замовлень
+- 🚁 Автоматичне призначення дронів
+- 📍 Симуляція руху дрона
+- 🔁 Логіка повернення дрона на базу
+- 🔐 JWT-аутентифікація
+- 📄 Масовий імпорт замовлень з CSV
+- 📑 Пагінація
+- 🧾 Розрахунок податку залежно від географії
+- 🗄 Повна сумісність з PostgreSQL (Supabase)
+
+---
+
+## 🛠 Технології
+
+- Java 21
+- Spring Boot 4
+- Spring Security
+- Spring Data JPA
+- Hibernate 7
+- PostgreSQL
+- Docker
+- Railway
+
+---
+
+## ⚙️ Необхідні змінні середовища
+
+Приклад для запуску:
+
 ```bash
-cd backend
+SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/db
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=password
+SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+JWT_SECRET=your_secret_key
 ```
+ 🐳 Запуск через Dockerr
+ 
+⃣Збірка образу
 
-Створіть `.env.properties`:
-
-```properties
-DATASOURCE_URL=jdbc:postgresql://aws-1-eu-west-1.pooler.supabase.com:6543/postgres
-DATASOURCE_USERNAME=postgres.ВАШ_PROJECT_REF
-DATASOURCE_PASSWORD=ВАШ_ПАРОЛЬ_БД
 ```
-
-Запуск:
-
-```bash
-docker compose up -d
-./gradlew bootRun
+docker build -t placeholder-drones .
 ```
+Запуск контейнера
+```
+docker run -p 8080:8080 \
+-e SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/db \
+-e SPRING_DATASOURCE_USERNAME=postgres \
+-e SPRING_DATASOURCE_PASSWORD=password \
+-e SPRING_JPA_HIBERNATE_DDL_AUTO=validate \
+-e JWT_SECRET=secret \
+placeholder-drones
+```
+Після запуску API буде доступне на:
 
-Бек буде на `http://localhost:8080`.
+http://localhost:8080
+
 
 ## Фронтенд
 
